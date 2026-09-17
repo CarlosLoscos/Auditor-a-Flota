@@ -1,0 +1,12 @@
+{
+    "name": "auditoria-flota",
+    "main": "src/index.js",
+    "compatibility_date": "2026-09-17",
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "auditoria-flota-db",
+            "database_id": "f12b6566-2777-4274-bf52-a4c242791d6a"
+        }
+    ]
+}
