@@ -1,6 +1,16 @@
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: CORS_HEADERS });
+    }
 
     if (request.method === "POST" && url.pathname === "/api/audits") {
       const body = await request.json();
@@ -11,7 +21,7 @@ export default {
       const createdAt = new Date().toISOString();
 
       if (!auditId || !city) {
-        return Response.json({ ok: false, error: "Falta audit_id o city" }, { status: 400 });
+        return Response.json({ ok: false, error: "Falta audit_id o city" }, { status: 400, headers: CORS_HEADERS });
       }
 
       await env.DB.prepare("DELETE FROM audit_answers WHERE audit_id = ?").bind(auditId).run();
@@ -26,7 +36,7 @@ export default {
         await env.DB.batch(statements);
       }
 
-      return Response.json({ ok: true, audit_id: auditId });
+      return Response.json({ ok: true, audit_id: auditId }, { headers: CORS_HEADERS });
     }
 
     if (request.method === "GET" && url.pathname === "/api/audits") {
@@ -48,9 +58,9 @@ export default {
         grouped[row.audit_id].answers[row.campo] = row.valor;
       }
 
-      return Response.json(Object.values(grouped));
+      return Response.json(Object.values(grouped), { headers: CORS_HEADERS });
     }
 
-    return new Response("Not found", { status: 404 });
+    return new Response("Not found", { status: 404, headers: CORS_HEADERS });
   }
 };
