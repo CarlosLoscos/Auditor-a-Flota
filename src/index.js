@@ -1,6 +1,6 @@
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -37,6 +37,15 @@ export default {
       }
 
       return Response.json({ ok: true, audit_id: auditId }, { headers: CORS_HEADERS });
+    }
+
+    if (request.method === "DELETE" && url.pathname === "/api/audits") {
+      const auditId = url.searchParams.get("audit_id");
+      if (!auditId) {
+        return Response.json({ ok: false, error: "Falta audit_id" }, { status: 400, headers: CORS_HEADERS });
+      }
+      await env.DB.prepare("DELETE FROM audit_answers WHERE audit_id = ?").bind(auditId).run();
+      return Response.json({ ok: true }, { headers: CORS_HEADERS });
     }
 
     if (request.method === "GET" && url.pathname === "/api/audits") {
