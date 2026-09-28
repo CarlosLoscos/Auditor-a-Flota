@@ -1171,8 +1171,11 @@ document.getElementById('export-csv').addEventListener('click', async ()=>{
       return labelsForAnswer(it, ansVal).join(' / ');
     })
   ]);
-  const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  downloadFile('auditoria_flota.csv', csv, 'text/csv');
+  // Punto y coma como separador (el que usa Excel por defecto en España/UE) y BOM
+  // para que los acentos se vean bien — así una coma dentro de una respuesta
+  // (p. ej. "Desgastados, no se pueden leer") nunca descuadra las columnas.
+  const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  downloadFile('auditoria_flota.csv', '\ufeff' + csv, 'text/csv;charset=utf-8;');
 });
 function downloadFile(name, content, type){
   const blob = new Blob([content], {type});
