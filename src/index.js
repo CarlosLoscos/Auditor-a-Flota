@@ -1,8 +1,15 @@
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, X-Access-Code",
 };
+
+function isAuthorized(request, env, url) {
+  const headerCode = request.headers.get("X-Access-Code");
+  const queryCode = url.searchParams.get("code");
+  const provided = headerCode || queryCode;
+  return provided && provided === env.ACCESS_CODE;
+}
 
 export default {
   async fetch(request, env) {
@@ -10,6 +17,10 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: CORS_HEADERS });
+    }
+
+    if (!isAuthorized(request, env, url)) {
+      return Response.json({ ok: false, error: "No autorizado" }, { status: 401, headers: CORS_HEADERS });
     }
 
     if (request.method === "POST" && url.pathname === "/api/audits") {
