@@ -18,6 +18,7 @@ export default {
       const city = body.city;
       const plate = body.plate || "";
       const answers = body.answers || {};
+      const photoKeys = body.photo_keys || {};
       const createdAt = new Date().toISOString();
 
       if (!auditId || !city) {
@@ -28,8 +29,8 @@ export default {
 
       const statements = Object.entries(answers).map(([campo, valor]) =>
         env.DB.prepare(
-          "INSERT INTO audit_answers (id, audit_id, city, plate, campo, valor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(crypto.randomUUID(), auditId, city, plate, campo, String(valor), createdAt)
+          "INSERT INTO audit_answers (id, audit_id, city, plate, campo, valor, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), auditId, city, plate, campo, String(valor), photoKeys[campo] || null, createdAt)
       );
 
       if (statements.length > 0) {
@@ -62,12 +63,40 @@ export default {
             plate: row.plate,
             created_at: row.created_at,
             answers: {},
+            photos: {},
           };
         }
         grouped[row.audit_id].answers[row.campo] = row.valor;
+        if (row.photo_key) {
+          grouped[row.audit_id].photos[row.campo] = row.photo_key;
+        }
       }
 
       return Response.json(Object.values(grouped), { headers: CORS_HEADERS });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/photos") {
+      const auditId = url.searchParams.get("audit_id");
+      const campo = url.searchParams.get("campo");
+      if (!auditId || !campo) {
+        return Response.json({ ok: false, error: "Falta audit_id o campo" }, { status: 400, headers: CORS_HEADERS });
+      }
+      const key = `${auditId}/${campo}.jpg`;
+      const contentType = request.headers.get("Content-Type") || "image/jpeg";
+      const bodyData = await request.arrayBuffer();
+      await env.PHOTOS.put(key, bodyData, { httpMetadata: { contentType } });
+      return Response.json({ ok: true, key }, { headers: CORS_HEADERS });
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith("/api/photos/")) {
+      const key = decodeURIComponent(url.pathname.replace("/api/photos/", ""));
+      const obj = await env.PHOTOS.get(key);
+      if (!obj) {
+        return new Response("Not found", { status: 404, headers: CORS_HEADERS });
+      }
+      return new Response(obj.body, {
+        headers: { ...CORS_HEADERS, "Content-Type": obj.httpMetadata?.contentType || "image/jpeg" },
+      });
     }
 
     return new Response("Not found", { status: 404, headers: CORS_HEADERS });

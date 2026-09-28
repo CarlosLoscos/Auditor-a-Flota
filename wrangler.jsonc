@@ -1,12 +1,18 @@
 {
-    "name": "auditoria-flota",
-    "main": "src/index.js",
-    "compatibility_date": "2026-09-17",
-    "d1_databases": [
-        {
-            "binding": "DB",
-            "database_name": "auditoria-flota-db",
-            "database_id": "f12b6566-2777-4274-bf52-a4c242791d6a"
-        }
-    ]
+	"name": "auditoria-flota",
+	"main": "src/index.js",
+	"compatibility_date": "2026-09-17",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "auditoria-flota-db",
+			"database_id": "f12b6566-2777-4274-bf52-a4c242791d6a"
+		}
+	],
+	"r2_buckets": [
+    {
+      "bucket_name": "auditoria-flota-fotos",
+      "binding": "PHOTOS"
+    }
+  ]
 }
