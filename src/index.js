@@ -19,7 +19,7 @@ export default {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
-    if (!isAuthorized(request, env, url)) {
+    if (url.pathname.startsWith("/api/") && !isAuthorized(request, env, url)) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401, headers: CORS_HEADERS });
     }
 
