@@ -11,6 +11,19 @@ function isAuthorized(request, env, url) {
   return provided && provided === env.ACCESS_CODE;
 }
 
+// Las respuestas de una sola casilla se guardan tal cual (texto plano).
+// Las de "marca varias a la vez" (arrays) se guardan como JSON para no perderlas,
+// y se reconstruyen como array al leerlas de vuelta.
+function encodeValor(valor) {
+  return Array.isArray(valor) ? JSON.stringify(valor) : String(valor);
+}
+function decodeValor(valor) {
+  if (typeof valor === "string" && valor.startsWith("[")) {
+    try { return JSON.parse(valor); } catch (e) { return valor; }
+  }
+  return valor;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -41,7 +54,7 @@ export default {
       const statements = Object.entries(answers).map(([campo, valor]) =>
         env.DB.prepare(
           "INSERT INTO audit_answers (id, audit_id, city, plate, campo, valor, photo_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(crypto.randomUUID(), auditId, city, plate, campo, String(valor), photoKeys[campo] || null, createdAt)
+        ).bind(crypto.randomUUID(), auditId, city, plate, campo, encodeValor(valor), photoKeys[campo] || null, createdAt)
       );
 
       if (statements.length > 0) {
@@ -77,7 +90,7 @@ export default {
             photos: {},
           };
         }
-        grouped[row.audit_id].answers[row.campo] = row.valor;
+        grouped[row.audit_id].answers[row.campo] = decodeValor(row.valor);
         if (row.photo_key) {
           grouped[row.audit_id].photos[row.campo] = row.photo_key;
         }
