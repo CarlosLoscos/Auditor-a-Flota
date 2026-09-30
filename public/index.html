@@ -109,6 +109,11 @@ body{
 .plate-status.ok{color:var(--ok);}
 .plate-thumb{width:100%;max-height:130px;object-fit:cover;border-radius:9px;margin-top:8px;border:1px solid var(--line);}
 
+.city-detect{padding:12px 13px;border-radius:9px;font-size:14.5px;font-weight:600;}
+.city-detect.loading{background:#F1F1F3;color:var(--ink-soft);}
+.city-detect.ok{background:var(--ok-bg);color:var(--ok);}
+.city-detect.error{background:var(--bad-bg);color:var(--bad);font-weight:500;font-size:13.5px;}
+
 .btn-primary{width:100%;background:var(--hazard);color:var(--hazard-ink);border:none;border-radius:11px;padding:15px;font-size:15.5px;font-weight:800;font-family:'CooltraGilroy',Arial,sans-serif;letter-spacing:.02em;cursor:pointer;margin-top:6px;}
 .btn-secondary{width:100%;background:#fff;border:1.5px solid var(--line);color:var(--ink);border-radius:11px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;}
 
@@ -471,8 +476,6 @@ WIZARD_STEPS.forEach((step, stepIdx)=>{
 });
 
 // Active Cooltra fleet cities (from data warehouse, last 7 days of real fleet)
-const CITIES = ['Barcelona','Lisbon','Madrid','Milan','Paris','Rome','Seville','Turin','Valencia'];
-
 // Tu propio backend real en Cloudflare — funciona igual dentro o fuera de Claude
 const API_BASE = 'https://auditoria-flota.cooltra-flota.workers.dev';
 
@@ -483,6 +486,8 @@ let groupSubIndex = 0; // qué sub-parte toca dentro del paso actual, si es un g
 let form = {city:'', plate:'', comment:''};
 let answers = {};
 let currentAuditId = crypto.randomUUID();
+let plateLookupStatus = 'idle'; // idle | loading | found | notfound
+let plateLookupTimer = null;
 let pendingPhotos = {}; // campo -> File
 let photoTargetCampo = null;
 
@@ -580,25 +585,19 @@ function stepLabel(){
 function renderIntake(){
   return `
     <div class="card">
-      <div class="field">
-        <label>Ciudad</label>
-        <select id="f-city">
-          <option value="" ${form.city===''?'selected':''} disabled>Selecciona una ciudad</option>
-          ${CITIES.map(c=>`<option value="${c}" ${form.city===c?'selected':''}>${c}</option>`).join('')}
-        </select>
-      </div>
       <div class="field" style="margin-bottom:6px;">
         <label>Matrícula</label>
         <div class="plate-capture">
-          <input type="text" id="f-plate" list="plate-datalist" autocomplete="off" placeholder="Ej. 4521-XYZ" value="${escapeAttr(form.plate)}">
+          <input type="text" id="f-plate" list="plate-datalist" autocomplete="off" placeholder="Ej. 4521XYZ" value="${escapeAttr(form.plate)}">
           <div class="plate-cam-btn" id="plate-cam-btn" title="Tomar foto de la matrícula">📷</div>
         </div>
         <datalist id="plate-datalist"></datalist>
         <input type="file" id="plate-photo" accept="image/*" capture="environment" style="display:none;">
         <div id="plate-status"></div>
       </div>
+      <div id="city-detect-box"></div>
     </div>
-    <button class="btn-primary" id="start-btn">Empezar revisión</button>
+    <button class="btn-primary" id="start-btn" disabled>Empezar revisión</button>
   `;
 }
 
@@ -802,21 +801,20 @@ function wireStepEvents(){
   const startBtn = document.getElementById('start-btn');
   if(startBtn){
     startBtn.addEventListener('click', ()=>{
-      form.city = document.getElementById('f-city').value;
-      form.plate = document.getElementById('f-plate').value.trim();
-      if(!form.city){ showToast('Selecciona una ciudad'); return; }
+      if(plateLookupStatus !== 'found'){ showToast('Falta encontrar la ciudad de esta matrícula'); return; }
       goToStep(1);
     });
   }
 
   const plateInput = document.getElementById('f-plate');
   if(plateInput){
-    plateInput.addEventListener('input', ()=>{ form.plate = plateInput.value; });
-  }
-  const citySelect = document.getElementById('f-city');
-  if(citySelect){
-    citySelect.addEventListener('change', updatePlateDatalist);
+    plateInput.addEventListener('input', ()=>{
+      form.plate = plateInput.value;
+      clearTimeout(plateLookupTimer);
+      plateLookupTimer = setTimeout(()=> lookupPlateCity(plateInput.value), 500);
+    });
     updatePlateDatalist();
+    if(form.plate){ lookupPlateCity(form.plate); } // por si venimos de un borrador recuperado
   }
   const camBtn = document.getElementById('plate-cam-btn');
   const photoInput = document.getElementById('plate-photo');
@@ -973,20 +971,69 @@ function escapeAttr(str){
   return (str||'').replace(/"/g,'&quot;');
 }
 
-// Sugerencias de matrícula: solo de la ciudad seleccionada, sacadas de lo ya guardado
+// Sugerencias de matrícula: de todo lo ya guardado antes (la ciudad ya no se elige a mano)
 function updatePlateDatalist(){
   const dl = document.getElementById('plate-datalist');
   if(!dl) return; // no estamos en la pantalla de datos de la moto
-  const citySelect = document.getElementById('f-city');
-  const city = citySelect ? citySelect.value : '';
-  if(!city || !Array.isArray(lastAuditsList)){
+  if(!Array.isArray(lastAuditsList)){
     dl.innerHTML = '';
     return;
   }
-  const plates = [...new Set(
-    lastAuditsList.filter(e => e.city === city && e.plate).map(e => e.plate)
-  )];
+  const plates = [...new Set(lastAuditsList.filter(e => e.plate).map(e => e.plate))];
   dl.innerHTML = plates.map(p => `<option value="${escapeAttr(p)}"></option>`).join('');
+}
+
+// ---- Detección automática de ciudad a partir del censo de la flota ----
+function renderCityDetectBox(){
+  const el = document.getElementById('city-detect-box');
+  if(!el) return;
+  if(plateLookupStatus === 'idle'){
+    el.innerHTML = '';
+  } else if(plateLookupStatus === 'loading'){
+    el.innerHTML = `<div class="field" style="margin-bottom:0;"><label>Ciudad</label><div class="city-detect loading">Buscando la ciudad de esta matrícula…</div></div>`;
+  } else if(plateLookupStatus === 'found'){
+    el.innerHTML = `<div class="field" style="margin-bottom:0;"><label>Ciudad</label><div class="city-detect ok">✓ ${escapeHtml(form.city)}</div></div>`;
+  } else if(plateLookupStatus === 'notfound'){
+    el.innerHTML = `<div class="field" style="margin-bottom:0;"><label>Ciudad</label><div class="city-detect error">No encontramos esta matrícula en el censo de la flota. Revisa que esté bien escrita.</div></div>`;
+  }
+}
+
+function updateStartBtnState(){
+  const btn = document.getElementById('start-btn');
+  if(btn) btn.disabled = plateLookupStatus !== 'found';
+}
+
+async function lookupPlateCity(rawPlate){
+  const normalized = (rawPlate||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(normalized.length < 3){
+    plateLookupStatus = 'idle';
+    form.city = '';
+    renderCityDetectBox();
+    updateStartBtnState();
+    return;
+  }
+  plateLookupStatus = 'loading';
+  renderCityDetectBox();
+  updateStartBtnState();
+  try{
+    const res = await fetch(`${API_BASE}/api/plate-lookup?plate=${encodeURIComponent(normalized)}`, {
+      headers: {'X-Access-Code': accessCode},
+    });
+    if(res.status === 401){ handleUnauthorized(); return; }
+    const data = await res.json();
+    if(data.ok){
+      plateLookupStatus = 'found';
+      form.city = data.city;
+    } else {
+      plateLookupStatus = 'notfound';
+      form.city = '';
+    }
+  }catch(e){
+    plateLookupStatus = 'notfound';
+    form.city = '';
+  }
+  renderCityDetectBox();
+  updateStartBtnState();
 }
 
 // ---- Plate photo OCR (best effort) ----
@@ -1034,6 +1081,7 @@ async function handlePlatePhoto(ev){
       form.plate = guess;
       statusEl.className = 'plate-status ok';
       statusEl.innerHTML = `✓ Lectura sugerida: <b>${guess}</b> — revisa que sea correcta.`;
+      lookupPlateCity(guess);
     } else {
       statusEl.className = 'plate-status';
       statusEl.innerHTML = `No se pudo leer con claridad, escríbela manualmente.`;

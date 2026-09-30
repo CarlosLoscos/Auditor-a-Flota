@@ -11,9 +11,6 @@ function isAuthorized(request, env, url) {
   return provided && provided === env.ACCESS_CODE;
 }
 
-// Las respuestas de una sola casilla se guardan tal cual (texto plano).
-// Las de "marca varias a la vez" (arrays) se guardan como JSON para no perderlas,
-// y se reconstruyen como array al leerlas de vuelta.
 function encodeValor(valor) {
   return Array.isArray(valor) ? JSON.stringify(valor) : String(valor);
 }
@@ -34,6 +31,19 @@ export default {
 
     if (url.pathname.startsWith("/api/") && !isAuthorized(request, env, url)) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/plate-lookup") {
+      const rawPlate = url.searchParams.get("plate") || "";
+      const normalized = rawPlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (!normalized) {
+        return Response.json({ ok: false, error: "Falta la matrícula" }, { status: 400, headers: CORS_HEADERS });
+      }
+      const row = await env.DB.prepare("SELECT city FROM fleet_census WHERE plate = ?").bind(normalized).first();
+      if (!row) {
+        return Response.json({ ok: false, error: "Matrícula no encontrada en el censo" }, { status: 404, headers: CORS_HEADERS });
+      }
+      return Response.json({ ok: true, city: row.city }, { headers: CORS_HEADERS });
     }
 
     if (request.method === "POST" && url.pathname === "/api/audits") {
