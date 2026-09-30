@@ -157,6 +157,18 @@ body{
 
 .skip-link{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;background:none;border:none;}
 
+.accordion-list{display:flex;flex-direction:column;gap:10px;}
+.accordion-section{background:var(--panel);border:1.5px solid var(--line);border-radius:13px;overflow:hidden;}
+.accordion-section.open{border-color:var(--hazard);}
+.accordion-header{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  padding:15px 16px;background:none;border:none;cursor:pointer;text-align:left;
+  font-family:'CooltraGilroy',Arial,sans-serif;font-size:15px;font-weight:600;color:var(--ink);
+}
+.accordion-chevron{font-size:18px;font-weight:700;color:var(--ink-soft);flex-shrink:0;margin-left:10px;}
+.accordion-section.open .accordion-chevron{color:var(--hazard);}
+.accordion-body{padding:0 14px 16px;}
+
 .photo-prompt{
   margin-top:16px;padding:14px;border-radius:12px;
   background:var(--bad-bg);border:1px solid var(--bad);
@@ -652,34 +664,47 @@ function renderItemStep(item){
   `;
 }
 
-// active: null = automático (primera sub-parte sin responder según groupSubIndex); si no, usa groupSubIndex directamente
+// Acordeón: todas las sub-partes apiladas, solo una abierta a la vez.
+// groupSubIndex = cuál está abierta ahora mismo (-1 = todas cerradas).
 function renderGroupStep(step){
-  const active = step.subitems[groupSubIndex] || step.subitems[0];
   const answeredCount = step.subitems.filter(si=>answers[si.id]).length;
-  const currentAnswer = answers[active.id];
-  const isBad = toneForAnswer(active, currentAnswer) === 'bad';
+
+  const sections = step.subitems.map((si, idx)=>{
+    const isOpen = idx === groupSubIndex;
+    const currentAnswer = answers[si.id];
+    const isBad = toneForAnswer(si, currentAnswer) === 'bad';
+    const answered = !!currentAnswer;
+
+    return `
+      <div class="accordion-section ${isOpen?'open':''}">
+        <button class="accordion-header" data-accordion-idx="${idx}">
+          <span>${si.label}${answered?' ✓':''}</span>
+          <span class="accordion-chevron">${isOpen?'−':'+'}</span>
+        </button>
+        ${isOpen ? `
+          <div class="accordion-body">
+            <div class="option-list">
+              ${si.options.map(opt=>`
+                <button class="option-btn option-btn-group ${currentAnswer===opt.id?'selected':''}" data-tone="${opt.tone}" data-item="${si.id}" data-opt="${opt.id}">
+                  <span>${opt.label}</span>
+                  <span class="tone-dot"></span>
+                </button>
+              `).join('')}
+            </div>
+            ${isBad ? renderPhotoPrompt(si.id) : ''}
+            ${isBad ? '<button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>' : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 
   return `
     <div class="item-screen">
       <h2 class="item-title">${step.groupLabel}</h2>
       <p class="item-hint">${answeredCount} de ${step.subitems.length} partes revisadas</p>
     </div>
-    <div class="field" style="margin-bottom:18px;">
-      <label>Sub-parte</label>
-      <select id="group-subselect">
-        ${step.subitems.map((si, idx)=>`<option value="${idx}" ${idx===groupSubIndex?'selected':''}>${si.label}${answers[si.id]?' ✓':''}</option>`).join('')}
-      </select>
-    </div>
-    <div class="option-list">
-      ${active.options.map(opt=>`
-        <button class="option-btn option-btn-group ${currentAnswer===opt.id?'selected':''}" data-tone="${opt.tone}" data-item="${active.id}" data-opt="${opt.id}">
-          <span>${opt.label}</span>
-          <span class="tone-dot"></span>
-        </button>
-      `).join('')}
-    </div>
-    ${isBad ? renderPhotoPrompt(active.id) : ''}
-    ${isBad ? '<button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>' : ''}
+    <div class="accordion-list">${sections}</div>
     <button class="skip-link" id="skip-btn">Saltar esta parte</button>
   `;
 }
@@ -735,14 +760,14 @@ function computeVerdict(){
   return 'ok';
 }
 
-// Tras responder (o saltar) una sub-parte de un grupo: pasa a la siguiente
-// sub-parte sin responder de ese mismo grupo, o al siguiente punto si ya está completo.
+// Tras responder (o saltar) una sub-parte de un grupo: se cierra y se abre
+// la siguiente en el acordeón, o se pasa al siguiente punto si era la última.
 function advanceWithinGroupOrStep(){
   const step = WIZARD_STEPS[stepIndex-1];
   if(step && step.type === 'group'){
-    const nextUnanswered = step.subitems.findIndex(si=>!answers[si.id]);
-    if(nextUnanswered !== -1){
-      groupSubIndex = nextUnanswered;
+    const idx = groupSubIndex < 0 ? 0 : groupSubIndex;
+    if(idx < step.subitems.length - 1){
+      groupSubIndex = idx + 1;
       renderWizard();
       return;
     }
@@ -812,13 +837,13 @@ function wireStepEvents(){
     });
   });
 
-  const groupSelect = document.getElementById('group-subselect');
-  if(groupSelect){
-    groupSelect.addEventListener('change', ()=>{
-      groupSubIndex = parseInt(groupSelect.value, 10);
+  document.querySelectorAll('.accordion-header').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = parseInt(btn.dataset.accordionIdx, 10);
+      groupSubIndex = (groupSubIndex === idx) ? -1 : idx; // tocar la que ya está abierta la cierra
       renderWizard();
     });
-  }
+  });
 
   document.querySelectorAll('.photo-add-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -878,8 +903,9 @@ function wireStepEvents(){
       if(step && step.type === 'group'){
         // saltar solo esta sub-parte, sin marcarla como respondida
         const total = step.subitems.length;
-        if(groupSubIndex < total - 1){
-          groupSubIndex++;
+        const idx = groupSubIndex < 0 ? 0 : groupSubIndex;
+        if(idx < total - 1){
+          groupSubIndex = idx + 1;
           renderWizard();
         } else {
           goToStep(stepIndex+1);
