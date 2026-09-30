@@ -308,21 +308,39 @@ const GENERIC_OPTIONS = [
   {id:'mal', label:'Mal / dañado', tone:'bad'},
 ];
 
+const PLASTICOS_OPTIONS = [
+  {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'leve', label:'Daños leves (rasgados/doblados/pequeñas roturas)', tone:'warn'},
+  {id:'mal', label:'Mal estado (muy rasgados o roturas mayores)', tone:'bad'},
+];
+
+const STICKERS_OPTIONS = [
+  {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'desgastado_legible', label:'Desgastados pero se puede leer', tone:'warn'},
+  {id:'desgastado_no_legible', label:'Desgastados o sueltos, no se pueden leer', tone:'bad'},
+];
+
+const FRENO_OPTIONS = [
+  {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'algo_desgastado', label:'Funcional pero algo desgastado', tone:'warn'},
+  {id:'muy_desgastado', label:'Muy desgastado', tone:'bad'},
+];
+
 const ITEMS = [
   // --- Lo que ve el usuario ---
-  {id:'asiento', section:'cliente', icon:'🪑', label:'Asiento', options:[
+  {id:'asiento', section:'cliente', label:'Asiento', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'costuras', label:'Costuras abiertas', tone:'warn'},
     {id:'rasgado', label:'Rasgado', tone:'bad'},
   ]},
-  {id:'phoneholder', section:'cliente', icon:'📱', label:'Phoneholder', options:[
+  {id:'phoneholder', section:'cliente', label:'Phoneholder', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'danado', label:'Funcional pero dañado', tone:'warn'},
-    {id:'sin_tornillo', label:'Falta tornillo', tone:'bad'},
-    {id:'sin_parte', label:'Falta parte derecha', tone:'bad'},
+    {id:'danado', label:'Funcional pero daño estético', tone:'warn'},
+    {id:'sin_tornillo_parte', label:'Falta tornillo/parte derecha', tone:'bad'},
+    {id:'colgando', label:'Phoneholder colgando', tone:'bad'},
     {id:'no_hay', label:'No hay', tone:'bad'},
   ]},
-  {id:'retrovisores', section:'cliente', icon:'🪞', label:'Retrovisores', options:[
+  {id:'retrovisores', section:'cliente', label:'Retrovisores', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'mal_uno', label:'Uno en mal estado (se mueve o no está fijo)', tone:'warn'},
     {id:'mal_dos', label:'Los dos en mal estado (se mueven o no están fijos)', tone:'bad'},
@@ -330,83 +348,115 @@ const ITEMS = [
     {id:'falta_izquierdo', label:'Falta el izquierdo', tone:'bad'},
     {id:'faltan_dos', label:'Faltan los dos', tone:'bad'},
   ]},
-  {id:'plasticos', section:'cliente', icon:'🏍️', label:'Carrocería / plásticos', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'leve', label:'Daños leves (rasgados/doblados/pequeñas roturas)', tone:'warn'},
-    {id:'mal', label:'Mal estado (muy rasgados o roturas mayores)', tone:'bad'},
-  ]},
-  {id:'pegatinas', section:'cliente', icon:'🏷️', label:'Stickers / pegatinas', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'desgastado_legible', label:'Desgastados pero se puede leer', tone:'warn'},
-    {id:'desgastado_no_legible', label:'Desgastados, no se pueden leer', tone:'bad'},
-  ]},
-  {id:'limpieza', section:'cliente', icon:'🧼', label:'Limpieza general', type:'multi', options:[
+  // --- Plásticos: grupo con desplegable ---
+  {id:'plasticos_laterales', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos laterales', options: PLASTICOS_OPTIONS},
+  {id:'plasticos_frontal_quilla', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos Frontales y Quilla', options: PLASTICOS_OPTIONS},
+  {id:'plasticos_foco', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos del foco de luces', options: PLASTICOS_OPTIONS},
+  {id:'guardabarros_delantero', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Guardabarros delantero', options: PLASTICOS_OPTIONS},
+  {id:'guardabarros_trasero', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Guardabarros trasero', options: PLASTICOS_OPTIONS},
+  // --- Stickers: grupo con desplegable ---
+  {id:'stickers_topcase', section:'cliente', group:'stickers', groupLabel:'Stickers', label:'Stickers topcase', options: STICKERS_OPTIONS},
+  {id:'stickers_laterales', section:'cliente', group:'stickers', groupLabel:'Stickers', label:'Stickers plásticos laterales (Cooltra)', options: STICKERS_OPTIONS},
+  {id:'limpieza', section:'cliente', label:'Limpieza general', type:'multi', options:[
     {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
-    {id:'carroceria_sucia', label:'Carrocería sucia', tone:'warn'},
-    {id:'topcase_sucio', label:'Topcase sucio', tone:'warn'},
+    {id:'plasticos_sucios', label:'Plásticos sucios', tone:'warn'},
+    {id:'dashboard_sucio', label:'Dashboard sucio', tone:'warn'},
+    {id:'topcase_ext_sucio', label:'Topcase exterior', tone:'warn'},
+    {id:'manillas_sucias', label:'Manillas/Puños sucios', tone:'bad'},
+    {id:'topcase_int_sucio', label:'Topcase interior', tone:'bad'},
     {id:'asiento_sucio', label:'Asiento sucio', tone:'bad'},
   ]},
-  {id:'cesta', section:'cliente', icon:'🧺', label:'Cesta / top case', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'topcase', section:'cliente', label:'Topcase', type:'multi', options:[
+    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'rallado', label:'Rallado', tone:'warn'},
     {id:'no_cierra', label:'No abre / no cierra correctamente', tone:'bad'},
     {id:'roto', label:'Roto', tone:'bad'},
   ]},
-  {id:'neumaticos_visual', section:'cliente', icon:'🛞', label:'Neumáticos', options:[
+  {id:'neumaticos_visual', section:'cliente', label:'Neumáticos', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'algo_desgastados', label:'Algo desgastados', tone:'warn'},
     {id:'muy_desgastados', label:'Muy desgastados', tone:'bad'},
-    {id:'pinchada_uno', label:'Una rueda pinchada', tone:'bad'},
-    {id:'pinchadas_dos', label:'2 ruedas pinchadas', tone:'bad'},
+    {id:'pinchada_uno', label:'Una rueda deshinchada', tone:'bad'},
+    {id:'pinchadas_dos', label:'2 ruedas deshinchadas', tone:'bad'},
   ]},
-  {id:'redecilla', section:'cliente', icon:'🪖', label:'Redecilla del casco', options:[
-    {id:'suficientes', label:'Hay suficientes (más de 3)', tone:'ok'},
-    {id:'pocas', label:'No hay suficientes (1 o 2)', tone:'warn'},
-    {id:'no_hay', label:'No hay', tone:'bad'},
+  {id:'redecilla', section:'cliente', label:'Redecilla del casco', options:[
+    {id:'suficientes', label:'Hay suficientes (más de 5)', tone:'ok'},
+    {id:'pocas', label:'No hay suficientes (3)', tone:'warn'},
+    {id:'no_hay', label:'No hay (0)', tone:'bad'},
   ]},
   // --- Revisión técnica ---
-  {id:'freno_del', section:'tecnica', icon:'🛑', label:'Freno delantero', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'algo_desgastado', label:'Funcional pero algo desgastado', tone:'warn'},
-    {id:'muy_desgastado', label:'Muy desgastado', tone:'bad'},
-  ]},
-  {id:'freno_tras', section:'tecnica', icon:'🛑', label:'Freno trasero', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'algo_desgastado', label:'Funcional pero algo desgastado', tone:'warn'},
-    {id:'muy_desgastado', label:'Muy desgastado', tone:'bad'},
-  ]},
-  {id:'luces', section:'tecnica', icon:'💡', label:'Luces', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
+  // --- Frenos: grupo con desplegable ---
+  {id:'freno_del', section:'tecnica', group:'frenos', groupLabel:'Frenos', label:'Freno delantero', options: FRENO_OPTIONS},
+  {id:'freno_tras', section:'tecnica', group:'frenos', groupLabel:'Frenos', label:'Freno trasero', options: FRENO_OPTIONS},
+  {id:'luces', section:'tecnica', label:'Luces', type:'multi', options:[
+    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'no_delanteras', label:'No funcionan las delanteras', tone:'bad'},
     {id:'no_traseras', label:'No funcionan las traseras', tone:'bad'},
-    {id:'ninguna', label:'No funciona ninguna', tone:'bad'},
+    {id:'no_intermitentes', label:'No funcionan los intermitentes', tone:'bad'},
   ]},
-  {id:'dashboard', section:'tecnica', icon:'📟', label:'Dashboard / pantalla', options:[
+  {id:'dashboard', section:'tecnica', label:'Dashboard / pantalla', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'mejorable', label:'Funcional pero estado mejorable', tone:'warn'},
-    {id:'agua', label:'Agua filtrada', tone:'warn'},
+    {id:'mejorable', label:'No se ve bien definido', tone:'warn'},
+    {id:'agua', label:'Agua filtrada/condensación en el interior', tone:'warn'},
     {id:'no_funciona', label:'No funciona', tone:'bad'},
   ]},
-  {id:'tapon_rueda', section:'tecnica', icon:'🔧', label:'Tapón de válvula del neumático', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'tapon_rueda', section:'tecnica', label:'Tapón de válvula del neumático', options:[
+    {id:'bien', label:'Están los dos', tone:'ok'},
     {id:'falta_delantero', label:'Falta el delantero', tone:'bad'},
     {id:'falta_trasero', label:'Falta el trasero', tone:'bad'},
     {id:'faltan_dos', label:'Faltan los dos', tone:'bad'},
   ]},
-  {id:'manetas', section:'tecnica', icon:'✋', label:'Manetas freno/embrague', options:[
+  // --- Maneta de freno y puño: grupo con desplegable ---
+  {id:'maneta_freno', section:'tecnica', group:'maneta_puno', groupLabel:'Maneta de freno y puño', label:'Maneta de freno', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'holgura', label:'Maneta mal colocada o con mucha holgura', tone:'warn'},
-    {id:'no_frena', label:'No frena', tone:'bad'},
+    {id:'holgura', label:'Hay cierta holgura', tone:'warn'},
+    {id:'rota', label:'Está partida o rota', tone:'bad'},
   ]},
-  {id:'fugas', section:'tecnica', icon:'💧', label:'Fugas visibles', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'hay_fugas', label:'Hay fugas visibles', tone:'bad'},
+  {id:'puno', section:'tecnica', group:'maneta_puno', groupLabel:'Maneta de freno y puño', label:'Puño', options:[
+    {id:'hay_puno', label:'Hay puño', tone:'ok'},
+    {id:'algo_holgura', label:'Hay algo de holgura', tone:'warn'},
+    {id:'no_hay_puno', label:'No hay puño', tone:'bad'},
   ]},
-  {id:'arranque', section:'tecnica', icon:'🔋', label:'Arranque / batería', options:[
+  {id:'arranque', section:'tecnica', label:'Arranque', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'no_primera', label:'No arranca a la primera', tone:'bad'},
+    {id:'no_consigue', label:'No consigue arrancar', tone:'bad'},
   ]},
 ];
+
+// Agrupa los ITEMS consecutivos que comparten "group" en un único paso del asistente
+function buildWizardSteps(items){
+  const steps = [];
+  let i = 0;
+  while(i < items.length){
+    const it = items[i];
+    if(it.group){
+      const groupId = it.group;
+      const groupLabel = it.groupLabel;
+      const subitems = [];
+      while(i < items.length && items[i].group === groupId){
+        subitems.push(items[i]);
+        i++;
+      }
+      steps.push({type:'group', groupId, groupLabel, subitems});
+    } else {
+      steps.push({type:'single', item: it});
+      i++;
+    }
+  }
+  return steps;
+}
+const WIZARD_STEPS = buildWizardSteps(ITEMS);
+
+// Para poder saltar directamente a un item concreto desde el resumen final
+const ITEM_STEP_LOOKUP = {};
+WIZARD_STEPS.forEach((step, stepIdx)=>{
+  if(step.type === 'single'){
+    ITEM_STEP_LOOKUP[step.item.id] = {stepIdx, subIdx:0};
+  } else {
+    step.subitems.forEach((si, subIdx)=>{ ITEM_STEP_LOOKUP[si.id] = {stepIdx, subIdx}; });
+  }
+});
 
 // Active Cooltra fleet cities (from data warehouse, last 7 days of real fleet)
 const CITIES = ['Barcelona','Lisbon','Madrid','Milan','Paris','Rome','Seville','Turin','Valencia'];
@@ -414,14 +464,21 @@ const CITIES = ['Barcelona','Lisbon','Madrid','Milan','Paris','Rome','Seville','
 // Tu propio backend real en Cloudflare — funciona igual dentro o fuera de Claude
 const API_BASE = 'https://auditoria-flota.cooltra-flota.workers.dev';
 
-// steps: 0 = intake, 1..N = items, N+1 = review
-const TOTAL_STEPS = ITEMS.length + 2;
+// steps: 0 = intake, 1..N = pasos del asistente (WIZARD_STEPS), N+1 = review
+const TOTAL_STEPS = WIZARD_STEPS.length + 2;
 let stepIndex = 0;
+let groupSubIndex = 0; // qué sub-parte toca dentro del paso actual, si es un grupo
 let form = {city:'', plate:'', comment:''};
 let answers = {};
 let currentAuditId = crypto.randomUUID();
 let pendingPhotos = {}; // campo -> File
 let photoTargetCampo = null;
+
+function goToStep(newIndex){
+  stepIndex = newIndex;
+  groupSubIndex = 0;
+  renderWizard();
+}
 
 document.getElementById('photo-input').addEventListener('change', (ev)=>{
   const file = ev.target.files[0];
@@ -478,8 +535,9 @@ function renderWizard(){
   let inner = '';
   if(stepIndex === 0){
     inner = renderIntake();
-  } else if(stepIndex <= ITEMS.length){
-    inner = renderItemStep(ITEMS[stepIndex-1]);
+  } else if(stepIndex <= WIZARD_STEPS.length){
+    const step = WIZARD_STEPS[stepIndex-1];
+    inner = step.type === 'group' ? renderGroupStep(step) : renderItemStep(step.item);
   } else {
     inner = renderReview();
   }
@@ -496,14 +554,14 @@ function renderWizard(){
   `;
 
   const backBtn = document.getElementById('wizard-back');
-  if(backBtn) backBtn.addEventListener('click', ()=>{ if(stepIndex>0){ stepIndex--; renderWizard(); } });
+  if(backBtn) backBtn.addEventListener('click', ()=>{ if(stepIndex>0){ goToStep(stepIndex-1); } });
 
   wireStepEvents();
 }
 
 function stepLabel(){
   if(stepIndex===0) return 'Datos de la moto';
-  if(stepIndex<=ITEMS.length) return `Punto ${stepIndex} de ${ITEMS.length}`;
+  if(stepIndex<=WIZARD_STEPS.length) return `Punto ${stepIndex} de ${WIZARD_STEPS.length}`;
   return 'Resumen y guardado';
 }
 
@@ -558,7 +616,6 @@ function renderItemStep(item){
     const selected = Array.isArray(currentAnswer) ? currentAnswer : [];
     return `
       <div class="item-screen">
-        <div class="item-icon">${item.icon || '🔎'}</div>
         <h2 class="item-title">${item.label}</h2>
         <p class="item-hint">Puedes marcar varias opciones a la vez</p>
       </div>
@@ -578,7 +635,6 @@ function renderItemStep(item){
 
   return `
     <div class="item-screen">
-      <div class="item-icon">${item.icon || '🔎'}</div>
       <h2 class="item-title">${item.label}</h2>
       <p class="item-hint">Toca la opción que mejor describe lo que ves</p>
     </div>
@@ -596,14 +652,47 @@ function renderItemStep(item){
   `;
 }
 
+// active: null = automático (primera sub-parte sin responder según groupSubIndex); si no, usa groupSubIndex directamente
+function renderGroupStep(step){
+  const active = step.subitems[groupSubIndex] || step.subitems[0];
+  const answeredCount = step.subitems.filter(si=>answers[si.id]).length;
+  const currentAnswer = answers[active.id];
+  const isBad = toneForAnswer(active, currentAnswer) === 'bad';
+
+  return `
+    <div class="item-screen">
+      <h2 class="item-title">${step.groupLabel}</h2>
+      <p class="item-hint">${answeredCount} de ${step.subitems.length} partes revisadas</p>
+    </div>
+    <div class="field" style="margin-bottom:18px;">
+      <label>Sub-parte</label>
+      <select id="group-subselect">
+        ${step.subitems.map((si, idx)=>`<option value="${idx}" ${idx===groupSubIndex?'selected':''}>${si.label}${answers[si.id]?' ✓':''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="option-list">
+      ${active.options.map(opt=>`
+        <button class="option-btn option-btn-group ${currentAnswer===opt.id?'selected':''}" data-tone="${opt.tone}" data-item="${active.id}" data-opt="${opt.id}">
+          <span>${opt.label}</span>
+          <span class="tone-dot"></span>
+        </button>
+      `).join('')}
+    </div>
+    ${isBad ? renderPhotoPrompt(active.id) : ''}
+    ${isBad ? '<button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>' : ''}
+    <button class="skip-link" id="skip-btn">Saltar esta parte</button>
+  `;
+}
+
 function renderReview(){
-  const rows = ITEMS.map((item, idx)=>{
+  const rows = ITEMS.map((item)=>{
     const ansVal = answers[item.id];
     const tone = toneForAnswer(item, ansVal);
     const labels = labelsForAnswer(item, ansVal);
+    const label = item.group ? `${item.groupLabel} · ${item.label}` : item.label;
     return `
-      <div class="review-row" data-jump="${idx+1}">
-        <span class="rl-label">${item.icon} ${item.label}${pendingPhotos[item.id] ? ' 📷' : ''}</span>
+      <div class="review-row" data-jump-item="${item.id}">
+        <span class="rl-label">${label}${pendingPhotos[item.id] ? ' 📷' : ''}</span>
         ${labels.length
           ? `<span class="rl-val"><span class="dot ${tone}"></span>${labels.join(', ')}<span class="chev">›</span></span>`
           : `<span class="rl-val empty">Sin responder<span class="chev">›</span></span>`
@@ -646,6 +735,21 @@ function computeVerdict(){
   return 'ok';
 }
 
+// Tras responder (o saltar) una sub-parte de un grupo: pasa a la siguiente
+// sub-parte sin responder de ese mismo grupo, o al siguiente punto si ya está completo.
+function advanceWithinGroupOrStep(){
+  const step = WIZARD_STEPS[stepIndex-1];
+  if(step && step.type === 'group'){
+    const nextUnanswered = step.subitems.findIndex(si=>!answers[si.id]);
+    if(nextUnanswered !== -1){
+      groupSubIndex = nextUnanswered;
+      renderWizard();
+      return;
+    }
+  }
+  if(stepIndex <= WIZARD_STEPS.length){ goToStep(stepIndex+1); }
+}
+
 function wireStepEvents(){
   const startBtn = document.getElementById('start-btn');
   if(startBtn){
@@ -653,8 +757,7 @@ function wireStepEvents(){
       form.city = document.getElementById('f-city').value;
       form.plate = document.getElementById('f-plate').value.trim();
       if(!form.city){ showToast('Selecciona una ciudad'); return; }
-      stepIndex = 1;
-      renderWizard();
+      goToStep(1);
     });
   }
 
@@ -674,7 +777,7 @@ function wireStepEvents(){
     photoInput.addEventListener('change', handlePlatePhoto);
   }
 
-  document.querySelectorAll('.option-btn:not(.option-btn-multi)').forEach(btn=>{
+  document.querySelectorAll('.option-btn:not(.option-btn-multi):not(.option-btn-group)').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const itemId = btn.dataset.item;
       const optId = btn.dataset.opt;
@@ -687,11 +790,35 @@ function wireStepEvents(){
       } else {
         btn.classList.add('selected');
         setTimeout(()=>{
-          if(stepIndex <= ITEMS.length){ stepIndex++; renderWizard(); }
+          if(stepIndex <= WIZARD_STEPS.length){ goToStep(stepIndex+1); }
         }, 220);
       }
     });
   });
+
+  document.querySelectorAll('.option-btn-group').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const itemId = btn.dataset.item;
+      const optId = btn.dataset.opt;
+      const tone = btn.dataset.tone;
+      answers[itemId] = optId;
+
+      if(tone === 'bad'){
+        renderWizard(); // se queda en la misma sub-parte para ofrecer la foto
+      } else {
+        btn.classList.add('selected');
+        setTimeout(()=>{ advanceWithinGroupOrStep(); }, 220);
+      }
+    });
+  });
+
+  const groupSelect = document.getElementById('group-subselect');
+  if(groupSelect){
+    groupSelect.addEventListener('change', ()=>{
+      groupSubIndex = parseInt(groupSelect.value, 10);
+      renderWizard();
+    });
+  }
 
   document.querySelectorAll('.photo-add-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -735,21 +862,40 @@ function wireStepEvents(){
   const continueBtn = document.getElementById('continue-btn');
   if(continueBtn){
     continueBtn.addEventListener('click', ()=>{
-      if(stepIndex <= ITEMS.length){ stepIndex++; renderWizard(); }
+      const step = WIZARD_STEPS[stepIndex-1];
+      if(step && step.type === 'group'){
+        advanceWithinGroupOrStep();
+      } else if(stepIndex <= WIZARD_STEPS.length){
+        goToStep(stepIndex+1);
+      }
     });
   }
 
   const skipBtn = document.getElementById('skip-btn');
   if(skipBtn){
     skipBtn.addEventListener('click', ()=>{
-      stepIndex++;
-      renderWizard();
+      const step = WIZARD_STEPS[stepIndex-1];
+      if(step && step.type === 'group'){
+        // saltar solo esta sub-parte, sin marcarla como respondida
+        const total = step.subitems.length;
+        if(groupSubIndex < total - 1){
+          groupSubIndex++;
+          renderWizard();
+        } else {
+          goToStep(stepIndex+1);
+        }
+      } else {
+        goToStep(stepIndex+1);
+      }
     });
   }
 
   document.querySelectorAll('.review-row').forEach(row=>{
     row.addEventListener('click', ()=>{
-      stepIndex = parseInt(row.dataset.jump, 10);
+      const loc = ITEM_STEP_LOOKUP[row.dataset.jumpItem];
+      if(!loc) return;
+      stepIndex = loc.stepIdx + 1;
+      groupSubIndex = loc.subIdx;
       renderWizard();
     });
   });
@@ -853,6 +999,7 @@ function saveDraftToLocalStorage(){
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       auditId: currentAuditId,
       stepIndex,
+      groupSubIndex,
       form,
       answers,
     }));
@@ -871,6 +1018,7 @@ function tryRestoreDraft(){
     if(!draft || !draft.form || !draft.form.city) return false; // no hay nada real que recuperar
     currentAuditId = draft.auditId || crypto.randomUUID();
     stepIndex = draft.stepIndex || 0;
+    groupSubIndex = draft.groupSubIndex || 0;
     form = draft.form;
     answers = draft.answers || {};
     return true;
@@ -882,6 +1030,7 @@ function resetWizard(){
   answers = {};
   pendingPhotos = {};
   stepIndex = 0;
+  groupSubIndex = 0;
   currentAuditId = crypto.randomUUID();
   clearDraftFromLocalStorage();
   renderWizard();
