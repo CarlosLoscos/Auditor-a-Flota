@@ -384,7 +384,7 @@ const ITEMS = [
     {id:'asiento_sucio', label:'Asiento sucio', tone:'bad'},
   ]},
   // --- Neumáticos: grupo con acordeón ---
-  {id:'neumaticos_visual', section:'cliente', group:'neumaticos', groupLabel:'Neumáticos', label:'Estado de los neumáticos', options:[
+  {id:'neumaticos_visual', section:'cliente', group:'neumaticos', groupLabel:'Neumáticos', label:'Estado de los neumáticos', noPhoto:true, options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'algo_desgastados', label:'Algo desgastados', tone:'warn'},
     {id:'muy_desgastados', label:'Muy desgastados', tone:'bad'},
@@ -398,7 +398,8 @@ const ITEMS = [
     {id:'faltan_dos', label:'Faltan los dos', tone:'bad'},
   ]},
   // --- Frenos y mandos: grupo con acordeón (probar moviendo la moto) ---
-  {id:'frenos', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Frenos', options: FRENO_OPTIONS},
+  {id:'freno_delantero', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Freno delantero', noPhoto:true, options: FRENO_OPTIONS},
+  {id:'freno_trasero', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Freno trasero', noPhoto:true, options: FRENO_OPTIONS},
   {id:'maneta_freno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Maneta de freno', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'holgura', label:'Hay cierta holgura', tone:'warn'},
@@ -410,7 +411,7 @@ const ITEMS = [
     {id:'no_hay_puno', label:'No hay puño', tone:'bad'},
   ]},
   // --- Sistema eléctrico: grupo con acordeón (con el contacto puesto) ---
-  {id:'luces', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Luces', type:'multi', options:[
+  {id:'luces', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Luces', type:'multi', noPhoto:true, options:[
     {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'no_delanteras', label:'No funcionan las delanteras', tone:'bad'},
     {id:'no_traseras', label:'No funcionan las traseras', tone:'bad'},
