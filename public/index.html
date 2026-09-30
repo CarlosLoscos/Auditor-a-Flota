@@ -810,11 +810,15 @@ function wireStepEvents(){
   if(plateInput){
     plateInput.addEventListener('input', ()=>{
       form.plate = plateInput.value;
+      updatePlateSuggestions(plateInput.value);
       clearTimeout(plateLookupTimer);
       plateLookupTimer = setTimeout(()=> lookupPlateCity(plateInput.value), 500);
     });
-    updatePlateDatalist();
-    if(form.plate){ lookupPlateCity(form.plate); } // por si venimos de un borrador recuperado
+    if(form.plate){
+      // por si venimos de un borrador recuperado
+      lookupPlateCity(form.plate);
+      updatePlateSuggestions(form.plate);
+    }
   }
   const camBtn = document.getElementById('plate-cam-btn');
   const photoInput = document.getElementById('plate-photo');
@@ -971,16 +975,29 @@ function escapeAttr(str){
   return (str||'').replace(/"/g,'&quot;');
 }
 
-// Sugerencias de matrícula: de todo lo ya guardado antes (la ciudad ya no se elige a mano)
-function updatePlateDatalist(){
+// Sugerencias de matrícula a partir del censo real de la flota, solo desde 5 caracteres
+let plateSuggestTimer = null;
+function updatePlateSuggestions(value){
   const dl = document.getElementById('plate-datalist');
   if(!dl) return; // no estamos en la pantalla de datos de la moto
-  if(!Array.isArray(lastAuditsList)){
+  const normalized = (value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  clearTimeout(plateSuggestTimer);
+  if(normalized.length < 5){
     dl.innerHTML = '';
     return;
   }
-  const plates = [...new Set(lastAuditsList.filter(e => e.plate).map(e => e.plate))];
-  dl.innerHTML = plates.map(p => `<option value="${escapeAttr(p)}"></option>`).join('');
+  plateSuggestTimer = setTimeout(async ()=>{
+    try{
+      const res = await fetch(`${API_BASE}/api/plate-suggest?prefix=${encodeURIComponent(normalized)}`, {
+        headers: {'X-Access-Code': accessCode},
+      });
+      if(res.status === 401){ handleUnauthorized(); return; }
+      const data = await res.json();
+      if(data.ok){
+        dl.innerHTML = data.plates.map(p => `<option value="${escapeAttr(p)}"></option>`).join('');
+      }
+    }catch(e){ /* sin sugerencias si falla, no pasa nada */ }
+  }, 300);
 }
 
 // ---- Detección automática de ciudad a partir del censo de la flota ----
@@ -1312,7 +1329,6 @@ async function renderHistory(){
 
   lastAuditsList = await loadInspections();
   renderHistoryList();
-  updatePlateDatalist();
 }
 
 function renderHistoryList(){

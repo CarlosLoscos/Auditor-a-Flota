@@ -46,6 +46,19 @@ export default {
       return Response.json({ ok: true, city: row.city }, { headers: CORS_HEADERS });
     }
 
+    if (request.method === "GET" && url.pathname === "/api/plate-suggest") {
+      const rawPrefix = url.searchParams.get("prefix") || "";
+      const prefix = rawPrefix.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (prefix.length < 5) {
+        return Response.json({ ok: true, plates: [] }, { headers: CORS_HEADERS });
+      }
+      const likePattern = prefix.replace(/[%_]/g, "\\$&") + "%";
+      const { results } = await env.DB.prepare(
+        "SELECT plate FROM fleet_census WHERE plate LIKE ? ESCAPE '\\' ORDER BY plate LIMIT 20"
+      ).bind(likePattern).all();
+      return Response.json({ ok: true, plates: results.map(r => r.plate) }, { headers: CORS_HEADERS });
+    }
+
     if (request.method === "POST" && url.pathname === "/api/audits") {
       const body = await request.json();
       const auditId = body.audit_id;
