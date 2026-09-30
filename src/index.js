@@ -49,7 +49,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/plate-suggest") {
       const rawPrefix = url.searchParams.get("prefix") || "";
       const prefix = rawPrefix.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (prefix.length < 5) {
+      if (prefix.length < 4) {
         return Response.json({ ok: true, plates: [] }, { headers: CORS_HEADERS });
       }
       const likePattern = prefix.replace(/[%_]/g, "\\$&") + "%";

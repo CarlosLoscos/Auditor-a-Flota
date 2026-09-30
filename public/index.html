@@ -982,7 +982,7 @@ function updatePlateSuggestions(value){
   if(!dl) return; // no estamos en la pantalla de datos de la moto
   const normalized = (value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   clearTimeout(plateSuggestTimer);
-  if(normalized.length < 5){
+  if(normalized.length < 4){
     dl.innerHTML = '';
     return;
   }
