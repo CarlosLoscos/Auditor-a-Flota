@@ -398,8 +398,7 @@ const ITEMS = [
   ]},
   // --- Revisión técnica ---
   // --- Frenos: grupo con desplegable ---
-  {id:'freno_del', section:'tecnica', group:'frenos', groupLabel:'Frenos', label:'Freno delantero', options: FRENO_OPTIONS},
-  {id:'freno_tras', section:'tecnica', group:'frenos', groupLabel:'Frenos', label:'Freno trasero', options: FRENO_OPTIONS},
+  {id:'frenos', section:'tecnica', label:'Frenos', options: FRENO_OPTIONS},
   {id:'luces', section:'tecnica', label:'Luces', type:'multi', options:[
     {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'no_delanteras', label:'No funcionan las delanteras', tone:'bad'},
@@ -429,7 +428,7 @@ const ITEMS = [
     {id:'algo_holgura', label:'Hay algo de holgura', tone:'warn'},
     {id:'no_hay_puno', label:'No hay puño', tone:'bad'},
   ]},
-  {id:'arranque', section:'tecnica', label:'Arranque', options:[
+  {id:'arranque', section:'tecnica', label:'Arranque', noPhoto:true, options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'no_primera', label:'No arranca a la primera', tone:'bad'},
     {id:'no_consigue', label:'No consigue arrancar', tone:'bad'},
@@ -622,7 +621,7 @@ function renderPhotoPrompt(campo){
 
 function renderItemStep(item){
   const currentAnswer = answers[item.id];
-  const isBad = toneForAnswer(item, currentAnswer) === 'bad';
+  const isBad = toneForAnswer(item, currentAnswer) === 'bad' && !item.noPhoto;
 
   if(item.type === 'multi'){
     const selected = Array.isArray(currentAnswer) ? currentAnswer : [];
@@ -672,7 +671,7 @@ function renderGroupStep(step){
   const sections = step.subitems.map((si, idx)=>{
     const isOpen = idx === groupSubIndex;
     const currentAnswer = answers[si.id];
-    const isBad = toneForAnswer(si, currentAnswer) === 'bad';
+    const isBad = toneForAnswer(si, currentAnswer) === 'bad' && !si.noPhoto;
     const answered = !!currentAnswer;
 
     return `
@@ -808,8 +807,10 @@ function wireStepEvents(){
       const optId = btn.dataset.opt;
       const tone = btn.dataset.tone;
       answers[itemId] = optId;
+      const item = itemById(itemId);
+      const wantsPhoto = tone === 'bad' && !(item && item.noPhoto);
 
-      if(tone === 'bad'){
+      if(wantsPhoto){
         // No avanza solo: se queda para ofrecer la foto opcional y esperar a "Continuar"
         renderWizard();
       } else {
@@ -827,8 +828,10 @@ function wireStepEvents(){
       const optId = btn.dataset.opt;
       const tone = btn.dataset.tone;
       answers[itemId] = optId;
+      const subitem = itemById(itemId);
+      const wantsPhoto = tone === 'bad' && !(subitem && subitem.noPhoto);
 
-      if(tone === 'bad'){
+      if(wantsPhoto){
         renderWizard(); // se queda en la misma sub-parte para ofrecer la foto
       } else {
         btn.classList.add('selected');
