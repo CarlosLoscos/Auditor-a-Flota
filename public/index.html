@@ -339,20 +339,20 @@ const FRENO_OPTIONS = [
 ];
 
 const ITEMS = [
-  // --- Lo que ve el usuario ---
-  {id:'asiento', section:'cliente', label:'Asiento', options:[
+  // --- Puesto de conducción: grupo con acordeón ---
+  {id:'asiento', section:'cliente', group:'puesto_conduccion', groupLabel:'Puesto de conducción', label:'Asiento', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'costuras', label:'Costuras abiertas', tone:'warn'},
     {id:'rasgado', label:'Rasgado', tone:'bad'},
   ]},
-  {id:'phoneholder', section:'cliente', label:'Phoneholder', options:[
+  {id:'phoneholder', section:'cliente', group:'puesto_conduccion', groupLabel:'Puesto de conducción', label:'Phoneholder', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'danado', label:'Funcional pero daño estético', tone:'warn'},
     {id:'sin_tornillo_parte', label:'Falta tornillo/parte derecha', tone:'bad'},
     {id:'colgando', label:'Phoneholder colgando', tone:'bad'},
     {id:'no_hay', label:'No hay', tone:'bad'},
   ]},
-  {id:'retrovisores', section:'cliente', label:'Retrovisores', options:[
+  {id:'retrovisores', section:'cliente', group:'puesto_conduccion', groupLabel:'Puesto de conducción', label:'Retrovisores', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'mal_uno', label:'Uno en mal estado (se mueve o no está fijo)', tone:'warn'},
     {id:'mal_dos', label:'Los dos en mal estado (se mueven o no están fijos)', tone:'bad'},
@@ -360,13 +360,13 @@ const ITEMS = [
     {id:'falta_izquierdo', label:'Falta el izquierdo', tone:'bad'},
     {id:'faltan_dos', label:'Faltan los dos', tone:'bad'},
   ]},
-  // --- Plásticos: grupo con desplegable ---
+  // --- Plásticos: grupo con acordeón ---
   {id:'plasticos_laterales', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos laterales', options: PLASTICOS_OPTIONS},
   {id:'plasticos_frontal_quilla', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos Frontales y Quilla', options: PLASTICOS_OPTIONS},
   {id:'plasticos_foco', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Plásticos del foco de luces', options: PLASTICOS_OPTIONS},
   {id:'guardabarros_delantero', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Guardabarros delantero', options: PLASTICOS_OPTIONS},
   {id:'guardabarros_trasero', section:'cliente', group:'plasticos', groupLabel:'Plásticos', label:'Guardabarros trasero', options: PLASTICOS_OPTIONS},
-  // --- Stickers: grupo con desplegable ---
+  // --- Stickers: grupo con acordeón ---
   {id:'stickers_topcase', section:'cliente', group:'stickers', groupLabel:'Stickers', label:'Stickers topcase', options: STICKERS_OPTIONS},
   {id:'stickers_laterales', section:'cliente', group:'stickers', groupLabel:'Stickers', label:'Stickers plásticos laterales (Cooltra)', options: STICKERS_OPTIONS},
   {id:'limpieza', section:'cliente', label:'Limpieza general', type:'multi', options:[
@@ -378,60 +378,61 @@ const ITEMS = [
     {id:'topcase_int_sucio', label:'Topcase interior', tone:'bad'},
     {id:'asiento_sucio', label:'Asiento sucio', tone:'bad'},
   ]},
-  {id:'topcase', section:'cliente', label:'Topcase', type:'multi', options:[
-    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
-    {id:'rallado', label:'Rallado', tone:'warn'},
-    {id:'no_cierra', label:'No abre / no cierra correctamente', tone:'bad'},
-    {id:'roto', label:'Roto', tone:'bad'},
-  ]},
-  {id:'neumaticos_visual', section:'cliente', label:'Neumáticos', options:[
+  // --- Neumáticos: grupo con acordeón ---
+  {id:'neumaticos_visual', section:'cliente', group:'neumaticos', groupLabel:'Neumáticos', label:'Estado de los neumáticos', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'algo_desgastados', label:'Algo desgastados', tone:'warn'},
     {id:'muy_desgastados', label:'Muy desgastados', tone:'bad'},
     {id:'pinchada_uno', label:'Una rueda deshinchada', tone:'bad'},
     {id:'pinchadas_dos', label:'2 ruedas deshinchadas', tone:'bad'},
   ]},
-  {id:'redecilla', section:'cliente', label:'Redecilla del casco', options:[
-    {id:'suficientes', label:'Hay suficientes (más de 5)', tone:'ok'},
-    {id:'pocas', label:'No hay suficientes (3)', tone:'warn'},
-    {id:'no_hay', label:'No hay (0)', tone:'bad'},
-  ]},
-  // --- Revisión técnica ---
-  // --- Frenos: grupo con desplegable ---
-  {id:'frenos', section:'tecnica', label:'Frenos', options: FRENO_OPTIONS},
-  {id:'luces', section:'tecnica', label:'Luces', type:'multi', options:[
-    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
-    {id:'no_delanteras', label:'No funcionan las delanteras', tone:'bad'},
-    {id:'no_traseras', label:'No funcionan las traseras', tone:'bad'},
-    {id:'no_intermitentes', label:'No funcionan los intermitentes', tone:'bad'},
-  ]},
-  {id:'dashboard', section:'tecnica', label:'Dashboard / pantalla', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
-    {id:'mejorable', label:'No se ve bien definido', tone:'warn'},
-    {id:'agua', label:'Agua filtrada/condensación en el interior', tone:'warn'},
-    {id:'no_funciona', label:'No funciona', tone:'bad'},
-  ]},
-  {id:'tapon_rueda', section:'tecnica', label:'Tapón de válvula del neumático', options:[
+  {id:'tapon_rueda', section:'cliente', group:'neumaticos', groupLabel:'Neumáticos', label:'Tapón de válvula del neumático', options:[
     {id:'bien', label:'Están los dos', tone:'ok'},
     {id:'falta_delantero', label:'Falta el delantero', tone:'bad'},
     {id:'falta_trasero', label:'Falta el trasero', tone:'bad'},
     {id:'faltan_dos', label:'Faltan los dos', tone:'bad'},
   ]},
-  // --- Maneta de freno y puño: grupo con desplegable ---
-  {id:'maneta_freno', section:'tecnica', group:'maneta_puno', groupLabel:'Maneta de freno y puño', label:'Maneta de freno', options:[
+  // --- Frenos y mandos: grupo con acordeón (probar moviendo la moto) ---
+  {id:'frenos', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Frenos', options: FRENO_OPTIONS},
+  {id:'maneta_freno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Maneta de freno', options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'holgura', label:'Hay cierta holgura', tone:'warn'},
     {id:'rota', label:'Está partida o rota', tone:'bad'},
   ]},
-  {id:'puno', section:'tecnica', group:'maneta_puno', groupLabel:'Maneta de freno y puño', label:'Puño', options:[
+  {id:'puno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Puño', options:[
     {id:'hay_puno', label:'Hay puño', tone:'ok'},
     {id:'algo_holgura', label:'Hay algo de holgura', tone:'warn'},
     {id:'no_hay_puno', label:'No hay puño', tone:'bad'},
   ]},
-  {id:'arranque', section:'tecnica', label:'Arranque', noPhoto:true, options:[
+  // --- Sistema eléctrico: grupo con acordeón (con el contacto puesto) ---
+  {id:'luces', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Luces', type:'multi', options:[
+    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
+    {id:'no_delanteras', label:'No funcionan las delanteras', tone:'bad'},
+    {id:'no_traseras', label:'No funcionan las traseras', tone:'bad'},
+    {id:'no_intermitentes', label:'No funcionan los intermitentes', tone:'bad'},
+  ]},
+  {id:'dashboard', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Dashboard / pantalla', options:[
+    {id:'bien', label:'En buen estado', tone:'ok'},
+    {id:'mejorable', label:'No se ve bien definido', tone:'warn'},
+    {id:'agua', label:'Agua filtrada/condensación en el interior', tone:'warn'},
+    {id:'no_funciona', label:'No funciona', tone:'bad'},
+  ]},
+  {id:'arranque', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Arranque', noPhoto:true, options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'no_primera', label:'No arranca a la primera', tone:'bad'},
     {id:'no_consigue', label:'No consigue arrancar', tone:'bad'},
+  ]},
+  // --- Topcase: grupo con acordeón (al final, hay que desbloquear la moto) ---
+  {id:'topcase', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Estado del topcase', type:'multi', options:[
+    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
+    {id:'rallado', label:'Rallado', tone:'warn'},
+    {id:'no_cierra', label:'No abre / no cierra correctamente', tone:'bad'},
+    {id:'roto', label:'Roto', tone:'bad'},
+  ]},
+  {id:'redecilla', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Redecilla del casco', options:[
+    {id:'suficientes', label:'Hay suficientes (más de 5)', tone:'ok'},
+    {id:'pocas', label:'No hay suficientes (3)', tone:'warn'},
+    {id:'no_hay', label:'No hay (0)', tone:'bad'},
   ]},
 ];
 
@@ -666,13 +667,49 @@ function renderItemStep(item){
 // Acordeón: todas las sub-partes apiladas, solo una abierta a la vez.
 // groupSubIndex = cuál está abierta ahora mismo (-1 = todas cerradas).
 function renderGroupStep(step){
-  const answeredCount = step.subitems.filter(si=>answers[si.id]).length;
+  const hasAnswer = (si)=> si.type==='multi'
+    ? (Array.isArray(answers[si.id]) && answers[si.id].length>0)
+    : !!answers[si.id];
+  const answeredCount = step.subitems.filter(hasAnswer).length;
 
   const sections = step.subitems.map((si, idx)=>{
     const isOpen = idx === groupSubIndex;
     const currentAnswer = answers[si.id];
     const isBad = toneForAnswer(si, currentAnswer) === 'bad' && !si.noPhoto;
-    const answered = !!currentAnswer;
+    const answered = hasAnswer(si);
+    const isMulti = si.type === 'multi';
+
+    let bodyHtml = '';
+    if(isOpen){
+      if(isMulti){
+        const selected = Array.isArray(currentAnswer) ? currentAnswer : [];
+        bodyHtml = `
+          <div class="option-list">
+            ${si.options.map(opt=>`
+              <button class="option-btn option-btn-multi ${selected.includes(opt.id)?'selected':''}" data-tone="${opt.tone}" data-item="${si.id}" data-opt="${opt.id}" data-exclusive="${opt.exclusive?'1':'0'}">
+                <span>${opt.label}</span>
+                <span class="tone-dot"></span>
+              </button>
+            `).join('')}
+          </div>
+          ${isBad ? renderPhotoPrompt(si.id) : ''}
+          <button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>
+        `;
+      } else {
+        bodyHtml = `
+          <div class="option-list">
+            ${si.options.map(opt=>`
+              <button class="option-btn option-btn-group ${currentAnswer===opt.id?'selected':''}" data-tone="${opt.tone}" data-item="${si.id}" data-opt="${opt.id}">
+                <span>${opt.label}</span>
+                <span class="tone-dot"></span>
+              </button>
+            `).join('')}
+          </div>
+          ${isBad ? renderPhotoPrompt(si.id) : ''}
+          ${isBad ? '<button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>' : ''}
+        `;
+      }
+    }
 
     return `
       <div class="accordion-section ${isOpen?'open':''}">
@@ -680,20 +717,7 @@ function renderGroupStep(step){
           <span>${si.label}${answered?' ✓':''}</span>
           <span class="accordion-chevron">${isOpen?'−':'+'}</span>
         </button>
-        ${isOpen ? `
-          <div class="accordion-body">
-            <div class="option-list">
-              ${si.options.map(opt=>`
-                <button class="option-btn option-btn-group ${currentAnswer===opt.id?'selected':''}" data-tone="${opt.tone}" data-item="${si.id}" data-opt="${opt.id}">
-                  <span>${opt.label}</span>
-                  <span class="tone-dot"></span>
-                </button>
-              `).join('')}
-            </div>
-            ${isBad ? renderPhotoPrompt(si.id) : ''}
-            ${isBad ? '<button class="btn-primary" id="continue-btn" style="margin-top:16px;">Continuar</button>' : ''}
-          </div>
-        ` : ''}
+        ${isOpen ? `<div class="accordion-body">${bodyHtml}</div>` : ''}
       </div>
     `;
   }).join('');
