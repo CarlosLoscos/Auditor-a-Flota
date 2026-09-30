@@ -1429,15 +1429,23 @@ document.getElementById('export-csv').addEventListener('click', async ()=>{
   if(list === null){ showToast('Sin conexión con el servidor'); return; }
   if(list.length===0){ showToast('No hay fichas para exportar'); return; }
   const itemIds = ITEMS.map(it=>it.id);
-  const header = ['fecha','ciudad','matricula','veredicto','comentario', ...ITEMS.map(it=>it.label)];
-  const rows = list.map(e=>[
-    e.date, e.city, e.plate, e.verdict, (e.comment||'').replace(/[\n,]/g,' '),
-    ...itemIds.map(id=>{
-      const it = itemById(id);
-      const ansVal = (e.answers||{})[id];
-      return labelsForAnswer(it, ansVal).join(' / ');
-    })
-  ]);
+  const header = ['fecha','ciudad','matricula','veredicto','comentario', ...ITEMS.map(it=>it.label), 'Fotos adjuntas'];
+  const rows = list.map(e=>{
+    const photos = e.photos || {};
+    const photoLinks = itemIds
+      .filter(id => photos[id])
+      .map(id => `${itemById(id).label}: ${API_BASE}/api/photos/${photos[id]}?code=${encodeURIComponent(accessCode)}`)
+      .join('\n');
+    return [
+      e.date, e.city, e.plate, e.verdict, (e.comment||'').replace(/[\n,]/g,' '),
+      ...itemIds.map(id=>{
+        const it = itemById(id);
+        const ansVal = (e.answers||{})[id];
+        return labelsForAnswer(it, ansVal).join(' / ');
+      }),
+      photoLinks,
+    ];
+  });
   // Punto y coma como separador (el que usa Excel por defecto en España/UE) y BOM
   // para que los acentos se vean bien — así una coma dentro de una respuesta
   // (p. ej. "Desgastados, no se pueden leer") nunca descuadra las columnas.
