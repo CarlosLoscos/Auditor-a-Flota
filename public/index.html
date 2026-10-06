@@ -309,6 +309,7 @@ body{
       <label class="import-label" for="import-file">Importar JSON</label>
       <input type="file" id="import-file" accept="application/json" style="display:none;">
     </div>
+    <button class="btn-secondary" id="export-package" style="margin-top:0;margin-bottom:10px;">Descargar paquete para análisis (CSV + fotos)</button>
     <button class="btn-secondary" id="clear-all-btn" style="margin-top:0;margin-bottom:14px;color:var(--bad);">Vaciar todo el historial</button>
     <div id="history-list"></div>
   </div>
@@ -1247,10 +1248,30 @@ async function loadInspections(){
   }
 }
 
+// Reduce la foto a 1600 px de lado máximo y JPEG 82 %: pasa de varios MB a unos 300-500 KB.
+// Si algo falla, se envía la original sin tocar.
+async function compressImage(file, maxSide = 1600, quality = 0.82){
+  try{
+    if(!file.type || !file.type.startsWith('image/')) return file;
+    const bmp = await createImageBitmap(file, {imageOrientation: 'from-image'});
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    if(bmp.close) bmp.close();
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+    return (blob && blob.size < file.size) ? blob : file;
+  }catch(e){
+    return file;
+  }
+}
+
 async function uploadPendingPhotos(auditId){
   const photoKeys = {};
-  for(const [campo, file] of Object.entries(pendingPhotos)){
+  for(const [campo, originalFile] of Object.entries(pendingPhotos)){
     try{
+      const file = await compressImage(originalFile);
       const res = await fetch(
         `${API_BASE}/api/photos?audit_id=${encodeURIComponent(auditId)}&campo=${encodeURIComponent(campo)}`,
         { method: 'POST', headers: {'Content-Type': file.type || 'image/jpeg', 'X-Access-Code': accessCode}, body: file }
@@ -1424,17 +1445,26 @@ document.getElementById('export-json').addEventListener('click', async ()=>{
   if(list === null){ showToast('Sin conexión con el servidor'); return; }
   downloadFile('auditoria_flota.json', JSON.stringify(list, null, 2), 'application/json');
 });
-document.getElementById('export-csv').addEventListener('click', async ()=>{
-  const list = await loadInspections();
-  if(list === null){ showToast('Sin conexión con el servidor'); return; }
-  if(list.length===0){ showToast('No hay fichas para exportar'); return; }
+// Nombre de archivo de cada foto dentro del paquete: matrícula + punto + trozo del id de ficha
+function photoFileName(entry, itemId){
+  const plate = (entry.plate || 'SINMATRICULA').toUpperCase().replace(/[^A-Z0-9]/g,'') || 'SINMATRICULA';
+  return `${plate}_${itemId}_${String(entry.id).slice(0,8)}.jpg`;
+}
+
+// Punto y coma como separador (el que usa Excel por defecto en España/UE) y BOM
+// para que los acentos se vean bien — así una coma dentro de una respuesta
+// (p. ej. "Desgastados, no se pueden leer") nunca descuadra las columnas.
+// photoMode 'links' = enlaces directos (CSV normal); 'files' = nombres de archivo (paquete ZIP)
+function buildCsv(list, photoMode){
   const itemIds = ITEMS.map(it=>it.id);
   const header = ['fecha','ciudad','matricula','veredicto','comentario', ...ITEMS.map(it=>it.label), 'Fotos adjuntas'];
   const rows = list.map(e=>{
     const photos = e.photos || {};
-    const photoLinks = itemIds
+    const photoRefs = itemIds
       .filter(id => photos[id])
-      .map(id => `${itemById(id).label}: ${API_BASE}/api/photos/${photos[id]}?code=${encodeURIComponent(accessCode)}`)
+      .map(id => photoMode === 'files'
+        ? `${itemById(id).label}: fotos/${photoFileName(e, id)}`
+        : `${itemById(id).label}: ${API_BASE}/api/photos/${photos[id]}?code=${encodeURIComponent(accessCode)}`)
       .join('\n');
     return [
       e.date, e.city, e.plate, e.verdict, (e.comment||'').replace(/[\n,]/g,' '),
@@ -1443,15 +1473,106 @@ document.getElementById('export-csv').addEventListener('click', async ()=>{
         const ansVal = (e.answers||{})[id];
         return labelsForAnswer(it, ansVal).join(' / ');
       }),
-      photoLinks,
+      photoRefs,
     ];
   });
-  // Punto y coma como separador (el que usa Excel por defecto en España/UE) y BOM
-  // para que los acentos se vean bien — así una coma dentro de una respuesta
-  // (p. ej. "Desgastados, no se pueden leer") nunca descuadra las columnas.
-  const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
-  downloadFile('auditoria_flota.csv', '\ufeff' + csv, 'text/csv;charset=utf-8;');
+  return '\ufeff' + [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+}
+
+document.getElementById('export-csv').addEventListener('click', async ()=>{
+  const list = await loadInspections();
+  if(list === null){ showToast('Sin conexión con el servidor'); return; }
+  if(list.length===0){ showToast('No hay fichas para exportar'); return; }
+  downloadFile('auditoria_flota.csv', buildCsv(list, 'links'), 'text/csv;charset=utf-8;');
 });
+
+// ---- Paquete para análisis: CSV + fotos con nombre claro + tabla de fotos, todo en un ZIP ----
+let jszipLoadPromise = null;
+function loadJSZip(){
+  if(window.JSZip) return Promise.resolve();
+  if(jszipLoadPromise) return jszipLoadPromise;
+  jszipLoadPromise = new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => { jszipLoadPromise = null; reject(new Error('no se pudo cargar el compresor')); };
+    document.head.appendChild(s);
+  });
+  return jszipLoadPromise;
+}
+
+document.getElementById('export-package').addEventListener('click', async ()=>{
+  const btn = document.getElementById('export-package');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  try{
+    btn.textContent = 'Cargando fichas…';
+    const list = await loadInspections();
+    if(list === null){ showToast('Sin conexión con el servidor'); return; }
+    if(list.length===0){ showToast('No hay fichas para exportar'); return; }
+
+    await loadJSZip();
+    const zip = new JSZip();
+    zip.file('auditoria_flota.csv', buildCsv(list, 'files'));
+
+    // Lista de todas las fotos a descargar
+    const jobs = [];
+    list.forEach(e=>{
+      Object.entries(e.photos || {}).forEach(([itemId, key])=>{
+        const it = itemById(itemId);
+        if(!it) return;
+        jobs.push({
+          entry: e, itemId, key,
+          file: photoFileName(e, itemId),
+          punto: it.group ? `${it.groupLabel} · ${it.label}` : it.label,
+          respuesta: labelsForAnswer(it, (e.answers||{})[itemId]).join(' / '),
+        });
+      });
+    });
+
+    let done = 0, failed = 0, unauthorized = false;
+    const queue = [...jobs];
+    async function worker(){
+      while(queue.length && !unauthorized){
+        const job = queue.shift();
+        try{
+          const res = await fetch(`${API_BASE}/api/photos/${job.key}`, { headers: {'X-Access-Code': accessCode} });
+          if(res.status === 401){ unauthorized = true; handleUnauthorized(); return; }
+          if(!res.ok) throw new Error('foto no disponible');
+          zip.file(`fotos/${job.file}`, await res.blob());
+          job.ok = true;
+        }catch(err){ failed++; job.ok = false; }
+        done++;
+        btn.textContent = `Descargando fotos ${done}/${jobs.length}…`;
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    if(unauthorized){ showToast('Código de acceso no válido'); return; }
+
+    // Tabla que relaciona cada foto con su moto y su punto
+    const okJobs = jobs.filter(j=>j.ok);
+    const photoRows = [['archivo','matricula','ciudad','fecha','punto','respuesta','veredicto_ficha']]
+      .concat(okJobs.map(j=>[j.file, j.entry.plate, j.entry.city, j.entry.date, j.punto, j.respuesta, j.entry.verdict]));
+    zip.file('fotos.csv', '\ufeff' + photoRows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n'));
+
+    btn.textContent = 'Comprimiendo…';
+    const blob = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `auditoria_flota_paquete_${new Date().toISOString().slice(0,10)}.zip`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    showToast(`Paquete listo: ${list.length} fichas, ${okJobs.length} fotos${failed? ` (${failed} no se pudieron descargar)`:''}`);
+  }catch(err){
+    console.error(err);
+    showToast('No se pudo preparar el paquete, inténtalo de nuevo');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
 function downloadFile(name, content, type){
   const blob = new Blob([content], {type});
   const url = URL.createObjectURL(blob);
