@@ -1,7 +1,7 @@
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Access-Code",
+  "Access-Control-Allow-Headers": "Content-Type, X-Access-Code, X-Admin-Code",
 };
 
 function isAuthorized(request, env, url) {
@@ -88,6 +88,10 @@ export default {
     }
 
     if (request.method === "DELETE" && url.pathname === "/api/audits") {
+      const adminCode = request.headers.get("X-Admin-Code");
+      if (!env.ADMIN_CODE || adminCode !== env.ADMIN_CODE) {
+        return Response.json({ ok: false, error: "Contraseña de administrador incorrecta" }, { status: 403, headers: CORS_HEADERS });
+      }
       const auditId = url.searchParams.get("audit_id");
       if (!auditId) {
         return Response.json({ ok: false, error: "Falta audit_id" }, { status: 400, headers: CORS_HEADERS });

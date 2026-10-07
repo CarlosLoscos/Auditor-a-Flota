@@ -173,6 +173,7 @@ body{
 .accordion-chevron{font-size:18px;font-weight:700;color:var(--ink-soft);flex-shrink:0;margin-left:10px;}
 .accordion-section.open .accordion-chevron{color:var(--hazard);}
 .accordion-body{padding:0 14px 16px;}
+.multi-hint{font-size:12.5px;font-weight:600;color:var(--hazard);margin:0 2px 10px;}
 
 .photo-prompt{
   margin-top:16px;padding:14px;border-radius:12px;
@@ -303,13 +304,7 @@ body{
       <input type="text" id="plate-search" placeholder="🔎 Buscar por matrícula (aunque sea solo un trozo)">
     </div>
     <div class="stats-row" id="stats-row"></div>
-    <div class="export-bar">
-      <button id="export-json">Exportar JSON</button>
-      <button id="export-csv">Exportar CSV</button>
-      <label class="import-label" for="import-file">Importar JSON</label>
-      <input type="file" id="import-file" accept="application/json" style="display:none;">
-    </div>
-    <button class="btn-secondary" id="export-package" style="margin-top:0;margin-bottom:10px;">Descargar paquete para análisis (CSV + fotos)</button>
+    <button class="btn-secondary" id="export-package" style="margin-top:0;margin-bottom:10px;">Exportar paquete para análisis (CSV + fotos)</button>
     <button class="btn-secondary" id="clear-all-btn" style="margin-top:0;margin-bottom:14px;color:var(--bad);">Vaciar todo el historial</button>
     <div id="history-list"></div>
   </div>
@@ -339,9 +334,8 @@ const STICKERS_OPTIONS = [
 ];
 
 const FRENO_OPTIONS = [
-  {id:'bien', label:'En buen estado', tone:'ok'},
-  {id:'algo_desgastado', label:'Funcional pero algo desgastado', tone:'warn'},
-  {id:'muy_desgastado', label:'Muy desgastado', tone:'bad'},
+  {id:'frena', label:'Frena', tone:'ok'},
+  {id:'no_frena', label:'No frena', tone:'bad'},
 ];
 
 const ITEMS = [
@@ -401,14 +395,13 @@ const ITEMS = [
   // --- Frenos y mandos: grupo con acordeón (probar moviendo la moto) ---
   {id:'freno_delantero', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Freno delantero', noPhoto:true, options: FRENO_OPTIONS},
   {id:'freno_trasero', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Freno trasero', noPhoto:true, options: FRENO_OPTIONS},
-  {id:'maneta_freno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Maneta de freno', options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
+  {id:'maneta_freno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Maneta de freno', type:'multi', options:[
+    {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'holgura', label:'Hay cierta holgura', tone:'warn'},
     {id:'rota', label:'Está partida o rota', tone:'bad'},
   ]},
   {id:'puno', section:'tecnica', group:'frenos_mandos', groupLabel:'Frenos y mandos', label:'Puño', options:[
     {id:'hay_puno', label:'Hay puño', tone:'ok'},
-    {id:'algo_holgura', label:'Hay algo de holgura', tone:'warn'},
     {id:'no_hay_puno', label:'No hay puño', tone:'bad'},
   ]},
   // --- Sistema eléctrico: grupo con acordeón (con el contacto puesto) ---
@@ -418,14 +411,13 @@ const ITEMS = [
     {id:'no_traseras', label:'No funcionan las traseras', tone:'bad'},
     {id:'no_intermitentes', label:'No funcionan los intermitentes', tone:'bad'},
   ]},
-  {id:'dashboard', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Dashboard / pantalla', options:[
+  {id:'dashboard', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Dashboard / pantalla', noPhoto:true, options:[
     {id:'bien', label:'En buen estado', tone:'ok'},
     {id:'mejorable', label:'No se ve bien definido', tone:'warn'},
-    {id:'agua', label:'Agua filtrada/condensación en el interior', tone:'warn'},
     {id:'no_funciona', label:'No funciona', tone:'bad'},
   ]},
   {id:'arranque', section:'tecnica', group:'electrico', groupLabel:'Sistema eléctrico', label:'Arranque', noPhoto:true, options:[
-    {id:'bien', label:'En buen estado', tone:'ok'},
+    {id:'bien', label:'Arranca a la primera', tone:'ok'},
     {id:'no_primera', label:'No arranca a la primera', tone:'bad'},
     {id:'no_consigue', label:'No consigue arrancar', tone:'bad'},
   ]},
@@ -434,9 +426,9 @@ const ITEMS = [
     {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'rallado', label:'Rallado', tone:'warn'},
     {id:'no_cierra', label:'No abre / no cierra correctamente', tone:'bad'},
-    {id:'roto', label:'Roto', tone:'bad'},
+    {id:'roto', label:'Plástico roto', tone:'bad'},
   ]},
-  {id:'redecilla', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Redecilla del casco', options:[
+  {id:'redecilla', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Redecilla del casco', noPhoto:true, options:[
     {id:'suficientes', label:'Hay suficientes (más de 5)', tone:'ok'},
     {id:'pocas', label:'No hay suficientes (3)', tone:'warn'},
     {id:'no_hay', label:'No hay (0)', tone:'bad'},
@@ -630,7 +622,7 @@ function renderItemStep(item){
     return `
       <div class="item-screen">
         <h2 class="item-title">${item.label}</h2>
-        <p class="item-hint">Puedes marcar varias opciones a la vez</p>
+        <p class="item-hint">Selección múltiple: puedes marcar varias opciones</p>
       </div>
       <div class="option-list">
         ${item.options.map(opt=>`
@@ -685,6 +677,7 @@ function renderGroupStep(step){
       if(isMulti){
         const selected = Array.isArray(currentAnswer) ? currentAnswer : [];
         bodyHtml = `
+          <p class="multi-hint">Selección múltiple: puedes marcar varias opciones</p>
           <div class="option-list">
             ${si.options.map(opt=>`
               <button class="option-btn option-btn-multi ${selected.includes(opt.id)?'selected':''}" data-tone="${opt.tone}" data-item="${si.id}" data-opt="${opt.id}" data-exclusive="${opt.exclusive?'1':'0'}">
@@ -1304,15 +1297,22 @@ async function saveAuditToApi(entry, photoKeys){
   }catch(e){ console.error(e); return false; }
 }
 
-async function deleteAuditFromApi(auditId){
+function askAdminCode(){
+  const code = prompt('Contraseña de administrador para borrar:');
+  return code ? code.trim() : null;
+}
+
+// Devuelve 'ok', 'forbidden' (contraseña de administrador incorrecta) o 'error'
+async function deleteAuditFromApi(auditId, adminCode){
   try{
     const res = await fetch(API_BASE + '/api/audits?audit_id=' + encodeURIComponent(auditId), {
       method: 'DELETE',
-      headers: {'X-Access-Code': accessCode},
+      headers: {'X-Access-Code': accessCode, 'X-Admin-Code': adminCode},
     });
-    if(res.status === 401){ handleUnauthorized(); return false; }
-    return res.ok;
-  }catch(e){ console.error(e); return false; }
+    if(res.status === 401){ handleUnauthorized(); return 'error'; }
+    if(res.status === 403){ return 'forbidden'; }
+    return res.ok ? 'ok' : 'error';
+  }catch(e){ console.error(e); return 'error'; }
 }
 
 async function saveCurrentEntry(){
@@ -1426,8 +1426,11 @@ function renderHistoryList(){
   listEl.querySelectorAll('.hist-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar esta ficha?')) return;
-      const ok = await deleteAuditFromApi(btn.dataset.id);
-      if(!ok) showToast('No se pudo eliminar, revisa la conexión');
+      const adminCode = askAdminCode();
+      if(!adminCode) return;
+      const result = await deleteAuditFromApi(btn.dataset.id, adminCode);
+      if(result === 'forbidden') showToast('Contraseña incorrecta');
+      else if(result !== 'ok') showToast('No se pudo eliminar, revisa la conexión');
       renderHistory();
     });
   });
@@ -1440,11 +1443,6 @@ function escapeHtml(str){
 }
 
 // ---- Export / Import ----
-document.getElementById('export-json').addEventListener('click', async ()=>{
-  const list = await loadInspections();
-  if(list === null){ showToast('Sin conexión con el servidor'); return; }
-  downloadFile('auditoria_flota.json', JSON.stringify(list, null, 2), 'application/json');
-});
 // Nombre de archivo de cada foto dentro del paquete: matrícula + punto + trozo del id de ficha
 function photoFileName(entry, itemId){
   const plate = (entry.plate || 'SINMATRICULA').toUpperCase().replace(/[^A-Z0-9]/g,'') || 'SINMATRICULA';
@@ -1478,13 +1476,6 @@ function buildCsv(list, photoMode){
   });
   return '\ufeff' + [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
 }
-
-document.getElementById('export-csv').addEventListener('click', async ()=>{
-  const list = await loadInspections();
-  if(list === null){ showToast('Sin conexión con el servidor'); return; }
-  if(list.length===0){ showToast('No hay fichas para exportar'); return; }
-  downloadFile('auditoria_flota.csv', buildCsv(list, 'links'), 'text/csv;charset=utf-8;');
-});
 
 // ---- Paquete para análisis: CSV + fotos con nombre claro + tabla de fotos, todo en un ZIP ----
 let jszipLoadPromise = null;
@@ -1581,38 +1572,20 @@ function downloadFile(name, content, type){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-document.getElementById('import-file').addEventListener('change', async (ev)=>{
-  const file = ev.target.files[0];
-  if(!file) return;
-  try{
-    const text = await file.text();
-    const imported = JSON.parse(text);
-    if(!Array.isArray(imported)) throw new Error('formato inválido');
-    let added = 0;
-    for(const e of imported){
-      if(e && e.id){
-        const ok = await saveAuditToApi(e);
-        if(ok) added++;
-      }
-    }
-    showToast(added > 0 ? `${added} ficha(s) importada(s)` : 'No se pudo importar ninguna');
-    renderHistory();
-  }catch(e){
-    showToast('No se pudo leer ese archivo JSON');
-  }
-  ev.target.value = '';
-});
-
 document.getElementById('clear-all-btn').addEventListener('click', async ()=>{
   if(!confirm('¿Seguro que quieres borrar TODAS las fichas guardadas? Esto no se puede deshacer.')) return;
+  const adminCode = askAdminCode();
+  if(!adminCode) return;
   const list = await loadInspections();
   if(list === null){ showToast('Sin conexión con el servidor'); return; }
-  let allOk = true;
+  let allOk = true, forbidden = false;
   for(const entry of list){
-    const ok = await deleteAuditFromApi(entry.id);
-    if(!ok) allOk = false;
+    const result = await deleteAuditFromApi(entry.id, adminCode);
+    if(result === 'forbidden'){ forbidden = true; break; }
+    if(result !== 'ok') allOk = false;
   }
-  showToast(allOk ? 'Historial vaciado' : 'Algunas fichas no se pudieron borrar');
+  if(forbidden) showToast('Contraseña incorrecta');
+  else showToast(allOk ? 'Historial vaciado' : 'Algunas fichas no se pudieron borrar');
   renderHistory();
 });
 
