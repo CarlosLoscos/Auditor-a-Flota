@@ -46,6 +46,16 @@ export default {
       return Response.json({ ok: true, city: row.city }, { headers: CORS_HEADERS });
     }
 
+    if (request.method === "GET" && url.pathname === "/api/census") {
+      // Lista de matrículas agrupada por ciudad (la agrupación la hace la propia base de datos)
+      const { results } = await env.DB.prepare(
+        "SELECT city, group_concat(plate, '|') AS plates FROM fleet_census GROUP BY city"
+      ).all();
+      const groups = {};
+      for (const r of results) groups[r.city] = r.plates;
+      return Response.json({ ok: true, groups }, { headers: { ...CORS_HEADERS, "Cache-Control": "private, max-age=3600" } });
+    }
+
     if (request.method === "GET" && url.pathname === "/api/plate-suggest") {
       const rawPrefix = url.searchParams.get("prefix") || "";
       const prefix = rawPrefix.toUpperCase().replace(/[^A-Z0-9]/g, "");

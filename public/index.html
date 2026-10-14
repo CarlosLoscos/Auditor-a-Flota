@@ -108,6 +108,9 @@ body{
 .plate-status.busy{color:#8a6116;}
 .plate-status.ok{color:var(--ok);}
 .plate-thumb{width:100%;max-height:130px;object-fit:cover;border-radius:9px;margin-top:8px;border:1px solid var(--line);}
+.plate-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.plate-chip{background:#fff;border:1.5px solid var(--hazard);color:var(--ink);border-radius:999px;padding:9px 14px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;}
+.plate-chip:active{background:#EAF4FF;}
 
 .city-detect{padding:12px 13px;border-radius:9px;font-size:14.5px;font-weight:600;}
 .city-detect.loading{background:#F1F1F3;color:var(--ink-soft);}
@@ -1048,59 +1051,265 @@ async function lookupPlateCity(rawPlate){
   updateStartBtnState();
 }
 
-// ---- Plate photo OCR (best effort) ----
+// ---- Lectura de matrícula por foto ----
+// El lector (Tesseract) se sirve desde este mismo servidor, sin depender de redes externas.
+// Tiene límites de tiempo: si algo se atasca, avisa en vez de quedarse esperando para siempre.
+const OCR_BASE = location.origin + '/tesseract/';
+const OCR_SCRIPT_TIMEOUT = 20000;   // cargar el script del lector
+const OCR_WORKER_TIMEOUT = 120000;  // preparar motor + modelo (la primera vez descarga ~7 MB)
+const OCR_READ_TIMEOUT = 60000;     // leer una foto
+
+function withTimeout(promise, ms, msg){
+  let t;
+  const timeout = new Promise((_, rej)=>{ t = setTimeout(()=>rej(new Error(msg || 'tiempo agotado')), ms); });
+  return Promise.race([promise, timeout]).finally(()=>clearTimeout(t));
+}
+
 let tesseractLoadPromise = null;
 function loadTesseract(){
   if(window.Tesseract) return Promise.resolve();
   if(tesseractLoadPromise) return tesseractLoadPromise;
   tesseractLoadPromise = new Promise((resolve, reject)=>{
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.src = OCR_BASE + 'tesseract.min.js';
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error('no se pudo cargar el lector'));
+    s.onerror = () => { tesseractLoadPromise = null; reject(new Error('no se pudo cargar el lector')); };
     document.head.appendChild(s);
   });
   return tesseractLoadPromise;
 }
 
+let ocrWorkerPromise = null;
+let ocrProgressCb = null;
+function getOcrWorker(){
+  if(ocrWorkerPromise) return ocrWorkerPromise;
+  const p = (async ()=>{
+    await withTimeout(loadTesseract(), OCR_SCRIPT_TIMEOUT, 'tiempo agotado cargando el lector');
+    // Importante: rutas absolutas, porque el lector arranca desde un "trabajador" interno que no entiende rutas relativas
+    const worker = await Tesseract.createWorker('eng', 1, {
+      workerPath: OCR_BASE + 'worker.min.js',
+      corePath: OCR_BASE,
+      langPath: OCR_BASE,
+      gzip: true,
+      logger: m => { if(ocrProgressCb) ocrProgressCb(m); },
+    });
+    await worker.setParameters({
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+    });
+    return worker;
+  })();
+  ocrWorkerPromise = p;
+  p.catch(()=>{ if(ocrWorkerPromise === p) ocrWorkerPromise = null; }); // si falla, se podrá reintentar
+  return p;
+}
+
+// Reduce la foto si es muy grande (el lector va mucho más rápido) y corrige su orientación.
+// Se mantiene en color: probado, convertirla a grises empeoraba la lectura.
+async function prepareImageForOcr(file, maxSide = 2000){
+  const bmp = await createImageBitmap(file, {imageOrientation: 'from-image'});
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  if(bmp.close) bmp.close();
+  return canvas;
+}
+
+// ---- Censo en el móvil: para cotejar la lectura con las matrículas reales ----
+const CENSUS_KEY = 'audit_census_v1';
+let censusPlates = null;
+async function ensureCensus(){
+  if(censusPlates) return censusPlates;
+  let groups = null;
+  try{
+    const raw = localStorage.getItem(CENSUS_KEY);
+    if(raw){ const c = JSON.parse(raw); if(c && c.groups && Date.now() - c.t < 24 * 3600 * 1000) groups = c.groups; }
+  }catch(e){}
+  if(!groups){
+    const res = await fetch(`${API_BASE}/api/census`, { headers: {'X-Access-Code': accessCode} });
+    if(res.status === 401){ handleUnauthorized(); throw new Error('no autorizado'); }
+    const data = await res.json();
+    if(!data.ok || !data.groups) throw new Error('censo no disponible');
+    groups = data.groups;
+    try{ localStorage.setItem(CENSUS_KEY, JSON.stringify({t: Date.now(), groups})); }catch(e){}
+  }
+  const plates = [];
+  for(const [city, str] of Object.entries(groups)){
+    for(const p of String(str).split('|')) if(p) plates.push([p, city]);
+  }
+  censusPlates = plates;
+  return plates;
+}
+
+// ---- Cotejo de una lectura OCR con el censo de matrículas (se ejecuta en el móvil) ----
+const CONFUSABLE = new Set(['0O','0Q','0D','1I','1L','5S','8B','2Z','6G','UV','CG','GQ','PR','PH','EF'].flatMap(p => [p, p[1] + p[0]]));
+const SKIP_END = 0.35;   // el OCR suele perder los caracteres de los extremos (la "C" inicial, letras finales)
+const LEAD_EXTRA = 0.6;  // caracteres de más al principio de la lectura
+let _row0 = new Float64Array(32), _row1 = new Float64Array(32);
+function subCost(a, b) { return a === b ? 0 : (CONFUSABLE.has(a + b) ? 0.3 : 1); }
+// Coste de alinear la lectura "a" con la matrícula "b" (alineamiento semiglobal ponderado)
+function plateCost(a, b) {
+  const n = a.length, m = b.length;
+  let prev = _row0, cur = _row1;
+  for (let j = 0; j <= m; j++) prev[j] = SKIP_END * j;
+  for (let i = 1; i <= n; i++) {
+    cur[0] = LEAD_EXTRA * i;
+    const ai = a.charCodeAt(i - 1);
+    for (let j = 1; j <= m; j++) {
+      const bj = b.charCodeAt(j - 1);
+      const s = ai === bj ? 0 : (CONFUSABLE.has(a[i - 1] + b[j - 1]) ? 0.3 : 1);
+      let v = prev[j - 1] + s;
+      const ins = prev[j] + 1, del = cur[j - 1] + 1;
+      if (ins < v) v = ins; if (del < v) v = del;
+      cur[j] = v;
+    }
+    const t = prev; prev = cur; cur = t;
+  }
+  let best = Infinity;
+  for (let j = 0; j <= m; j++) { const c = prev[j] + SKIP_END * (m - j); if (c < best) best = c; }
+  return best;
+}
+// tokens: lecturas OCR normalizadas (A-Z0-9). plates: [[matricula, ciudad], ...]
+function rankPlates(tokens, plates, maxCost = 2.0, limit = 5) {
+  const toks = [...new Set(tokens.filter(t => t.length >= 4 && t.length <= 12))].slice(0, 8);
+  if (!toks.length) return [];
+  const out = [];
+  for (let k = 0; k < plates.length; k++) {
+    const plate = plates[k][0];
+    let best = Infinity;
+    for (let t = 0; t < toks.length; t++) { const c = plateCost(toks[t], plate); if (c < best) best = c; }
+    if (best <= maxCost) out.push({ plate, city: plates[k][1], cost: Math.round(best * 100) / 100 });
+  }
+  out.sort((x, y) => x.cost - y.cost || (x.plate < y.plate ? -1 : 1));
+  return out.slice(0, limit);
+}
+
+// Lecturas candidatas: palabras sueltas y pares contiguos (la matrícula a veces sale partida: "C3107" + "BWF")
+function ocrTokensFromResult(data){
+  const norm = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const words = (data.words || []).map(w => norm(w.text)).filter(Boolean);
+  const fromText = String(data.text || '').split(/\s+/).map(norm).filter(Boolean);
+  const pairs = [];
+  for(let i = 0; i < words.length - 1; i++) pairs.push(words[i] + words[i+1]);
+  const all = [...new Set([...words, ...fromText, ...pairs])].filter(t => t.length >= 4 && t.length <= 12);
+  const score = t => (/\d/.test(t) && /[A-Z]/.test(t) ? 100 : 0) + Math.min(t.length, 8);
+  return all.sort((a, b) => score(b) - score(a));
+}
+
 function cleanPlateGuess(raw){
-  // Keep only letters/numbers/dashes, uppercase, take the most plate-like token
   const cleaned = (raw||'').toUpperCase().replace(/[^A-Z0-9\- \n]/g,' ');
   const tokens = cleaned.split(/[\s\n]+/).filter(Boolean);
-  // Prefer a token with both letters and digits, length 5-9 (typical plate shape)
   const platelike = tokens.find(t => /[0-9]/.test(t) && /[A-Z]/.test(t) && t.length>=5 && t.length<=9);
   return (platelike || tokens.join('') || '').slice(0,10);
+}
+
+function applyPlateChoice(plate){
+  const plateInput = document.getElementById('f-plate');
+  const statusEl = document.getElementById('plate-status');
+  if(!plateInput) return;
+  plateInput.value = plate;
+  form.plate = plate;
+  lookupPlateCity(plate);
+  updatePlateSuggestions(plate);
+  if(statusEl){
+    statusEl.className = 'plate-status ok';
+    statusEl.innerHTML = `✓ Matrícula elegida: <b>${plate}</b>`;
+  }
+}
+
+function renderPlateChips(statusEl, results, thumbHtml){
+  statusEl.className = 'plate-status';
+  statusEl.innerHTML = `
+    <div style="width:100%;">
+      <div style="margin-bottom:8px;color:var(--ink);font-weight:700;font-size:13px;">¿Es alguna de estas? Toca la tuya</div>
+      <div class="plate-chips">${results.map(r => `<button type="button" class="plate-chip" data-plate="${escapeAttr(r.plate)}">${escapeHtml(r.plate)} · ${escapeHtml(r.city)}</button>`).join('')}</div>
+      <div style="margin-top:8px;">Si no está, escríbela: con 4 caracteres te sugiero.</div>
+      ${thumbHtml}
+    </div>`;
+  statusEl.querySelectorAll('.plate-chip').forEach(b => b.addEventListener('click', () => applyPlateChoice(b.dataset.plate)));
+}
+
+// Una pasada de lectura con un modo concreto: 11 = texto disperso (foto de la moto entera),
+// 6 y 13 = bloque / línea (foto de cerca de la matrícula)
+async function ocrPass(worker, canvas, psm){
+  await worker.setParameters({ tessedit_pageseg_mode: psm });
+  const { data } = await withTimeout(worker.recognize(canvas, {}, {blocks: true}), OCR_READ_TIMEOUT, 'tiempo agotado leyendo la foto');
+  return { tokens: ocrTokensFromResult(data), text: data.text || '' };
 }
 
 async function handlePlatePhoto(ev){
   const file = ev.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('plate-status');
-  const plateInput = document.getElementById('f-plate');
+  const thumb = `<img class="plate-thumb" src="${URL.createObjectURL(file)}">`;
+  const setBusy = txt => { statusEl.className = 'plate-status busy'; statusEl.innerHTML = `⏳ ${txt}<br>${thumb}`; };
+  const pct = m => (m.progress != null ? ` ${Math.round(m.progress * 100)} %` : '');
+  let reading = 'Leyendo matrícula…';
 
-  const previewUrl = URL.createObjectURL(file);
-  statusEl.className = 'plate-status busy';
-  statusEl.innerHTML = `⏳ Leyendo matrícula…<br><img class="plate-thumb" src="${previewUrl}">`;
+  setBusy('Preparando el lector…');
+  ocrProgressCb = m => {
+    const st = String(m.status || '');
+    if(st === 'recognizing text') setBusy(reading + pct(m));
+    else if(/loading|initializ/.test(st)) setBusy('Preparando el lector (solo la primera vez)…' + pct(m));
+  };
 
   try{
-    await loadTesseract();
-    const worker = await Tesseract.createWorker('eng');
-    const { data:{ text } } = await worker.recognize(file);
-    await worker.terminate();
-    const guess = cleanPlateGuess(text);
-    if(guess){
-      plateInput.value = guess;
-      form.plate = guess;
-      statusEl.className = 'plate-status ok';
-      statusEl.innerHTML = `✓ Lectura sugerida: <b>${guess}</b> — revisa que sea correcta.`;
-      lookupPlateCity(guess);
+    const worker = await withTimeout(getOcrWorker(), OCR_WORKER_TIMEOUT, 'tiempo agotado preparando el lector');
+    setBusy(reading);
+    const canvas = await prepareImageForOcr(file);
+
+    let census = null;
+    try{ census = await ensureCensus(); }catch(e){ console.warn('censo no disponible', e); }
+
+    // 1ª pasada: la que mejor funciona con la moto entera en la foto
+    const p1 = await ocrPass(worker, canvas, Tesseract.PSM.SPARSE_TEXT);
+    let tokens = p1.tokens, text = p1.text;
+    let results = census ? rankPlates(tokens, census) : [];
+
+    // Si no hay una coincidencia clara (o no hay censo y no se leyó nada): 2ª y 3ª pasada, pensadas para fotos de cerca
+    const clear = results.length && results[0].cost <= 1.0;
+    if(census ? !clear : !tokens.length){
+      reading = 'Leyendo matrícula (2.º intento)…';
+      setBusy(reading);
+      const p2 = await ocrPass(worker, canvas, Tesseract.PSM.SINGLE_BLOCK);
+      const p3 = await ocrPass(worker, canvas, Tesseract.PSM.RAW_LINE);
+      tokens = [...new Set([...tokens, ...p2.tokens, ...p3.tokens])];
+      text = [text, p2.text, p3.text].join(' ');
+      if(census) results = rankPlates(tokens, census);
+    }
+
+    if(census){
+      if(results.length === 0){
+        statusEl.className = 'plate-status';
+        statusEl.innerHTML = `No he podido reconocer la matrícula en la foto. Escríbela: con 4 caracteres te sugiero.${thumb}`;
+      } else if(results[0].cost === 0 && (results.length === 1 || results[1].cost > 0)){
+        applyPlateChoice(results[0].plate);   // lectura exacta de una matrícula del censo
+      } else {
+        renderPlateChips(statusEl, results, thumb);
+      }
     } else {
-      statusEl.className = 'plate-status';
-      statusEl.innerHTML = `No se pudo leer con claridad, escríbela manualmente.`;
+      // Sin censo: se propone la lectura tal cual, como antes
+      const guess = cleanPlateGuess(text);
+      const plateInput = document.getElementById('f-plate');
+      if(guess){
+        plateInput.value = guess; form.plate = guess;
+        statusEl.className = 'plate-status ok';
+        statusEl.innerHTML = `✓ Lectura sugerida: <b>${escapeHtml(guess)}</b> — revisa que sea correcta.`;
+        lookupPlateCity(guess);
+      } else {
+        statusEl.className = 'plate-status';
+        statusEl.innerHTML = `No se pudo leer con claridad, escríbela manualmente.`;
+      }
     }
   }catch(e){
+    console.error('lectura de matrícula', e);
     statusEl.className = 'plate-status';
-    statusEl.innerHTML = `No se pudo leer automáticamente, escríbela manualmente.`;
+    statusEl.innerHTML = `No se pudo leer la foto (${escapeHtml(e.message || 'error')}). Escríbela: con 4 caracteres te sugiero.`;
+  }finally{
+    ocrProgressCb = null;
+    ev.target.value = '';   // permite repetir con la misma foto
   }
 }
 
@@ -1199,6 +1408,8 @@ document.getElementById('access-gate-form').addEventListener('submit', async (ev
 
 if(!accessCode){
   showAccessGate();
+}else{
+  hideAccessGate();   // código ya guardado: no volver a pedirlo al abrir la app
 }
 
 // ---- Conexión con tu API real (Cloudflare Worker + D1) ----
