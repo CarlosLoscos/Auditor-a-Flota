@@ -21,6 +21,63 @@ function decodeValor(valor) {
   return valor;
 }
 
+
+// ---- Lectura de matrícula con IA de visión (Workers AI) ----
+function bytesToBase64(bytes) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+const PLATE_PROMPT =
+  "This photo shows a scooter or motorcycle, or a close-up of its license plate. " +
+  "Read the license plate. Reply ONLY with the plate characters (letters and digits, no spaces, no explanation). " +
+  "If you can see two or three possible readings, write each on its own line (max 3 lines). " +
+  "If there is no readable plate, reply exactly: NONE";
+
+async function readPlateWithAI(env, bytes) {
+  const dataUrl = "data:image/jpeg;base64," + bytesToBase64(bytes);
+  const attempts = [
+    { model: "@cf/meta/llama-4-scout-17b-16e-instruct", input: () => ({
+        messages: [{ role: "user", content: [
+          { type: "text", text: PLATE_PROMPT },
+          { type: "image_url", image_url: { url: dataUrl } } ] }],
+        max_tokens: 60, temperature: 0 }) },
+    { model: "@cf/meta/llama-3.2-11b-vision-instruct", input: () => ({
+        messages: [{ role: "user", content: [
+          { type: "text", text: PLATE_PROMPT },
+          { type: "image_url", image_url: { url: dataUrl } } ] }],
+        max_tokens: 60, temperature: 0 }) },
+    { model: "@cf/meta/llama-3.2-11b-vision-instruct", input: () => ({
+        prompt: PLATE_PROMPT, image: Array.from(bytes), max_tokens: 60, temperature: 0 }) },
+  ];
+  const errors = [];
+  for (const a of attempts) {
+    for (let retry = 0; retry < 2; retry++) {
+      try {
+        const out = await env.AI.run(a.model, a.input());
+        let text = out && (out.response !== undefined ? out.response : (out.result && out.result.response));
+        if (text && typeof text === "object") text = JSON.stringify(text);
+        if (typeof text === "string" && text.trim()) return { model: a.model, text: text.trim() };
+        errors.push(a.model + ": respuesta vacía");
+        break;
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        // Los modelos de Meta piden aceptar la licencia una sola vez
+        if (retry === 0 && /agree|licen[sc]e|5016/i.test(msg)) {
+          try { await env.AI.run(a.model, { prompt: "agree" }); continue; } catch (e2) { /* sigue */ }
+        }
+        errors.push(a.model + ": " + msg.slice(0, 160));
+        break;
+      }
+    }
+  }
+  throw new Error(errors.join(" | "));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -31,6 +88,22 @@ export default {
 
     if (url.pathname.startsWith("/api/") && !isAuthorized(request, env, url)) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/plate-ocr") {
+      if (!env.AI) {
+        return Response.json({ ok: false, error: "IA no configurada en el servidor (falta el binding AI)" }, { status: 501, headers: CORS_HEADERS });
+      }
+      const buf = new Uint8Array(await request.arrayBuffer());
+      if (buf.length < 1000 || buf.length > 4 * 1024 * 1024) {
+        return Response.json({ ok: false, error: "Imagen no válida o demasiado grande" }, { status: 400, headers: CORS_HEADERS });
+      }
+      try {
+        const r = await readPlateWithAI(env, buf);
+        return Response.json({ ok: true, text: r.text, model: r.model }, { headers: CORS_HEADERS });
+      } catch (e) {
+        return Response.json({ ok: false, error: String(e.message || e).slice(0, 400) }, { status: 502, headers: CORS_HEADERS });
+      }
     }
 
     if (request.method === "GET" && url.pathname === "/api/plate-lookup") {
