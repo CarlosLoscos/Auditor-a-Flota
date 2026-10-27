@@ -449,8 +449,14 @@ const ITEMS = [
   {id:'topcase', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Estado del topcase', type:'multi', options:[
     {id:'bien', label:'En buen estado', tone:'ok', exclusive:true},
     {id:'rallado', label:'Rallado', tone:'warn'},
+    {id:'faltan_embellecedores', label:'Faltan embellecedores del topcase', tone:'warn'},
     {id:'no_cierra', label:'No abre / no cierra correctamente', tone:'bad'},
     {id:'roto', label:'Plástico roto', tone:'bad'},
+  ]},
+  {id:'cascos', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Cascos', options:[
+    {id:'dos', label:'Están los dos cascos', tone:'ok'},
+    {id:'falta_uno', label:'Falta un casco', tone:'bad'},
+    {id:'faltan_dos', label:'Faltan los dos cascos', tone:'bad'},
   ]},
   {id:'redecilla', section:'cliente', group:'topcase_redecilla', groupLabel:'Topcase', label:'Redecilla del casco', noPhoto:true, options:[
     {id:'suficientes', label:'Hay suficientes (más de 5)', tone:'ok'},
